@@ -1,0 +1,149 @@
+---
+/**
+ * Sala 2.1 — Lloyd, el ritmo por lotes. El ciclo se ve en dos tiempos nítidos:
+ * primero TODOS los puntos se reasignan, y solo entonces los centroides saltan.
+ */
+---
+
+<section class="section" id="sala-lloyd" aria-labelledby="lloyd-titulo">
+  <div class="prose reveal">
+    <h2 id="lloyd-titulo">Lloyd, el ritmo por lotes</h2>
+    <p>
+      Lloyd es el K-Means «de libro» y la base de todo lo demás. Su seña de
+      identidad es el <strong>movimiento en bloque</strong>: en cada iteración
+      se reasignan <em>todos</em> los puntos a la vez, y solo después los
+      centroides saltan de golpe a su nueva media. Dos tiempos, siempre en el
+      mismo orden.
+    </p>
+    <p>
+      Avanza <em>tiempo a tiempo</em> y fíjate: primero cambian los colores
+      (asignación masiva), luego se mueven los centroides (actualización).
+    </p>
+  </div>
+
+  <div class="lab reveal">
+    <div class="panel">
+      <div class="canvas-wrap">
+        <canvas aria-label="Visualización del ciclo por lotes de Lloyd"></canvas>
+      </div>
+      <div class="controls">
+        <button class="btn btn-primary" data-action="beat">1 · asignar puntos</button>
+        <button class="btn" data-action="play">reproducir</button>
+        <button class="btn" data-action="reset">reiniciar</button>
+      </div>
+      <dl class="metrics">
+        <div class="metric">
+          <dt>iteración</dt>
+          <dd data-out="iteration">0</dd>
+        </div>
+        <div class="metric">
+          <dt>Inercia</dt>
+          <dd data-out="inertia">·</dd>
+        </div>
+        <div class="metric">
+          <dt>estado</dt>
+          <dd data-out="status">listo</dd>
+        </div>
+      </dl>
+    </div>
+  </div>
+</section>
+
+<script>
+  import { Lloyd } from '../../lib/algorithms/lloyd.ts';
+  import type { Point } from '../../lib/algorithms/types.ts';
+  import { blobs } from '../../lib/data/datasets.ts';
+  import { CanvasRenderer } from '../../lib/sim/renderer.ts';
+
+  const root = document.getElementById('sala-lloyd')!;
+  const canvas = root.querySelector('canvas')!;
+  const out = (n: string) => root.querySelector<HTMLElement>(`[data-out="${n}"]`)!;
+  const btn = (a: string) => root.querySelector<HTMLButtonElement>(`[data-action="${a}"]`)!;
+
+  const seed = 5;
+  const points: Point[] = blobs(33, 160);
+  const lloyd = new Lloyd();
+  const renderer = new CanvasRenderer(canvas);
+
+  // 'assign' = el siguiente tiempo reasigna; 'update' = el siguiente mueve centroides
+  let phase: 'assign' | 'update' = 'assign';
+  let pending: Point[] = []; // centroides nuevos, aún sin mostrar
+  let timer: ReturnType<typeof setTimeout> | null = null;
+  let playing = false;
+
+  // terminado del todo: convergido y con el último salto de centroides ya mostrado
+  const finished = () => lloyd.converged && phase === 'assign';
+
+  function refresh() {
+    out('iteration').textContent = String(lloyd.metrics.iteration);
+    out('inertia').textContent = Number.isNaN(lloyd.metrics.inertia)
+      ? '·'
+      : lloyd.metrics.inertia.toFixed(3);
+    out('status').textContent = finished()
+      ? 'convergido'
+      : playing
+        ? 'en marcha'
+        : lloyd.metrics.iteration === 0 && phase === 'assign'
+          ? 'listo'
+          : 'pausado';
+    btn('beat').textContent = phase === 'assign' ? '1 · asignar puntos' : '2 · actualizar centroides';
+    btn('play').textContent = playing ? 'pausar' : 'reproducir';
+    btn('beat').disabled = finished();
+    btn('play').disabled = finished();
+  }
+
+  /** Un tiempo del ciclo: o reasigna en bloque, o mueve los centroides. */
+  function beat() {
+    if (finished()) return;
+    if (phase === 'assign') {
+      const before = lloyd.centroids.map((c) => ({ ...c }));
+      lloyd.step(); // asigna y recalcula, pero mostramos solo la asignación
+      pending = lloyd.centroids.map((c) => ({ ...c }));
+      renderer.setState({ points, labels: lloyd.labels, centroids: before }, false);
+      phase = 'update';
+    } else {
+      renderer.setState({ points, labels: lloyd.labels, centroids: pending });
+      phase = 'assign';
+    }
+    refresh();
+  }
+
+  function stop() {
+    playing = false;
+    if (timer) clearTimeout(timer);
+    timer = null;
+    refresh();
+  }
+
+  function play() {
+    if (playing || finished()) return;
+    playing = true;
+    const loop = () => {
+      if (!playing) return;
+      beat();
+      if (finished()) stop();
+      else timer = setTimeout(loop, 650);
+    };
+    loop();
+  }
+
+  function reset() {
+    stop();
+    lloyd.init(points, 3, seed);
+    phase = 'assign';
+    renderer.setState({ points, labels: lloyd.labels, centroids: lloyd.centroids }, false);
+    refresh();
+  }
+
+  btn('beat').addEventListener('click', () => {
+    stop();
+    beat();
+  });
+  btn('play').addEventListener('click', () => (playing ? stop() : play()));
+  btn('reset').addEventListener('click', reset);
+  root.addEventListener('contentvisibilityautostatechange', (ev) => {
+    if ((ev as ContentVisibilityAutoStateChangeEvent).skipped) stop();
+  });
+
+  reset();
+</script>

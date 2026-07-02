@@ -1,0 +1,246 @@
+/* Tokens de diseño — ver docs/DISENO.md */
+:root {
+  --bg: #fafaf8;
+  --surface: #ffffff;
+  --ink: #1a1a1a;
+  --ink-soft: #6b6b6b;
+  --line: #e6e6e1;
+  --accent: #2d5bff;
+
+  --c1: #2d5bff;
+  --c2: #ff7a3d;
+  --c3: #12b886;
+  --c4: #e64980;
+  --c5: #f2b705;
+  --c6: #7048e8;
+
+  --font-sans: ui-sans-serif, system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif;
+}
+
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+  background: var(--bg);
+  color: var(--ink);
+  font-family: var(--font-sans);
+  font-size: 1.05rem;
+  line-height: 1.6;
+  -webkit-font-smoothing: antialiased;
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  html {
+    scroll-behavior: smooth;
+  }
+}
+
+h1,
+h2,
+h3 {
+  line-height: 1.15;
+  text-wrap: balance;
+}
+
+h1 {
+  font-size: clamp(2.5rem, 6vw, 4rem);
+  font-weight: 750;
+  letter-spacing: -0.02em;
+}
+
+h2 {
+  font-size: clamp(1.6rem, 3vw, 2.2rem);
+  font-weight: 700;
+  letter-spacing: -0.01em;
+}
+
+p {
+  margin-block: 0 1em;
+}
+
+/* columna de lectura centrada y estrecha */
+.prose {
+  max-width: 62ch;
+  margin-inline: auto;
+  padding-inline: 24px;
+}
+
+.section {
+  padding-block: 96px;
+  /* el navegador se salta el render fuera de pantalla; los scripts de cada
+     sección pausan su simulación con contentvisibilityautostatechange */
+  content-visibility: auto;
+  contain-intrinsic-size: auto none auto 900px;
+}
+
+.caption {
+  font-size: 0.85rem;
+  color: var(--ink-soft);
+}
+
+/* ---- laboratorios ---- */
+
+.lab {
+  max-width: 860px;
+  margin-inline: auto;
+  padding-inline: 24px;
+}
+
+.lab canvas {
+  display: block;
+  width: 100%;
+  aspect-ratio: 3 / 2;
+  background: var(--surface);
+  touch-action: none;
+}
+
+/* panel que agrupa lienzo, controles y métricas como un solo instrumento */
+.panel {
+  background: var(--surface);
+  border: 1px solid var(--line);
+}
+
+.canvas-wrap {
+  position: relative;
+}
+
+/* pista de uso dentro del lienzo; desaparece con la primera interacción */
+.hint {
+  position: absolute;
+  right: 10px;
+  bottom: 8px;
+  margin: 0;
+  font-size: 0.78rem;
+  color: var(--ink-soft);
+  background: rgb(255 255 255 / 0.82);
+  padding: 2px 10px;
+  pointer-events: none;
+  transition: opacity 400ms ease;
+}
+
+.hint.is-hidden {
+  opacity: 0;
+}
+
+.panel .controls {
+  margin: 0;
+  padding: 12px 16px;
+  border-top: 1px solid var(--line);
+}
+
+.panel .metrics {
+  margin: 0;
+  padding: 12px 16px 16px;
+  border-top: 1px solid var(--line);
+}
+
+/* ---- controles ---- */
+
+.controls {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 12px 16px;
+  margin-block: 16px;
+}
+
+.btn {
+  font: inherit;
+  font-size: 0.95rem;
+  color: var(--ink);
+  background: var(--surface);
+  border: 1px solid var(--line);
+  padding: 8px 16px;
+  cursor: pointer;
+  transition: border-color 120ms ease, color 120ms ease, opacity 120ms ease;
+}
+
+.btn:hover:not(:disabled) {
+  border-color: var(--accent);
+  color: var(--accent);
+}
+
+.btn:disabled {
+  opacity: 0.4;
+  cursor: default;
+}
+
+/* la acción principal de cada lab; una sola por panel */
+.btn-primary {
+  background: var(--accent);
+  border-color: var(--accent);
+  color: #fff;
+}
+
+.btn-primary:hover:not(:disabled) {
+  color: #fff;
+  border-color: var(--accent);
+  opacity: 0.86;
+}
+
+.btn:focus-visible,
+input:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+
+.field {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 0.95rem;
+  color: var(--ink-soft);
+}
+
+input[type='range'] {
+  accent-color: var(--accent);
+}
+
+/* ---- métricas ---- */
+
+.metrics {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 32px;
+  margin-block: 16px;
+}
+
+.metric {
+  display: grid;
+  gap: 2px;
+}
+
+.metric dt {
+  font-size: 0.8rem;
+  color: var(--ink-soft);
+}
+
+.metric dd {
+  margin: 0;
+  font-size: 1.4rem;
+  font-weight: 650;
+  font-variant-numeric: tabular-nums;
+}
+
+/* ---- entradas de sección al hacer scroll (decorativas: sin fallback JS) ---- */
+
+@media (prefers-reduced-motion: no-preference) {
+  @supports ((animation-timeline: view()) and (animation-range: entry)) {
+    .reveal {
+      animation: fade-up auto linear backwards;
+      animation-timeline: view();
+      animation-range: entry 0% entry 35%;
+    }
+
+    @keyframes fade-up {
+      from {
+        opacity: 0;
+        translate: 0 24px;
+      }
+    }
+  }
+}

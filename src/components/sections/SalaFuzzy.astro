@@ -1,0 +1,148 @@
+---
+/**
+ * Sala 2.5 — Fuzzy / Soft K-Means, la duda. Los puntos no tienen color sólido:
+ * llevan una mezcla según su pertenencia a cada grupo. El deslizador `m`
+ * endurece o difumina las fronteras; señalar un punto muestra sus porcentajes.
+ */
+---
+
+<section class="section" id="sala-fuzzy" aria-labelledby="fuzzy-titulo">
+  <div class="prose reveal">
+    <h2 id="fuzzy-titulo">Fuzzy, la duda</h2>
+    <p>
+      Todas las variantes anteriores obligan a cada punto a elegir un único
+      grupo. Fuzzy rompe esa rigidez: cada punto tiene un
+      <strong>grado de pertenencia</strong> a cada clúster (puede ser 70&nbsp;%
+      de uno y 30&nbsp;% de otro) y su color es literalmente esa mezcla. Es la
+      variante adecuada cuando los límites no están claros: segmentación de
+      imágenes, diagnóstico médico, perfiles de clientes.
+    </p>
+    <p>
+      El parámetro de borrosidad <em>m</em> controla la duda: cerca de 1 las
+      fronteras se endurecen hacia el K-Means clásico; con valores altos, todo
+      se difumina. Mueve el deslizador y pasa el ratón por los puntos de
+      frontera para leer sus porcentajes.
+    </p>
+  </div>
+
+  <div class="lab reveal">
+    <div class="panel">
+      <div class="canvas-wrap">
+        <canvas aria-label="Visualización de Fuzzy C-Means: cada punto se colorea con la mezcla de sus pertenencias"></canvas>
+        <p class="hint" data-hint>pasa el ratón por un punto de frontera</p>
+      </div>
+      <div class="controls">
+        <button class="btn btn-primary" data-action="play">reproducir</button>
+        <button class="btn" data-action="reset">reiniciar</button>
+        <label class="field">
+          borrosidad m = <output data-out="m">2.0</output>
+          <input type="range" min="1.2" max="4" step="0.2" value="2" data-in="m" aria-label="parámetro de borrosidad m" />
+        </label>
+      </div>
+      <dl class="metrics">
+        <div class="metric">
+          <dt>iteración</dt>
+          <dd data-out="iteration">0</dd>
+        </div>
+        <div class="metric">
+          <dt>función objetivo (SSE dura)</dt>
+          <dd data-out="inertia">·</dd>
+        </div>
+        <div class="metric">
+          <dt>punto señalado</dt>
+          <dd data-out="probe" style="font-size: 1rem; font-weight: 500;">ninguno</dd>
+        </div>
+      </dl>
+    </div>
+  </div>
+</section>
+
+<script>
+  import { Fuzzy } from '../../lib/algorithms/fuzzy.ts';
+  import { anisotropic } from '../../lib/data/datasets.ts';
+  import { Engine } from '../../lib/sim/engine.ts';
+  import { CanvasRenderer } from '../../lib/sim/renderer.ts';
+
+  const root = document.getElementById('sala-fuzzy')!;
+  const canvas = root.querySelector('canvas')!;
+  const out = (n: string) => root.querySelector<HTMLElement>(`[data-out="${n}"]`)!;
+  const btn = (a: string) => root.querySelector<HTMLButtonElement>(`[data-action="${a}"]`)!;
+
+  const seed = 8;
+  const k = 3;
+  const points = anisotropic(47, 180);
+  const fuzzy = new Fuzzy();
+  const renderer = new CanvasRenderer(canvas);
+  let hovered = -1;
+
+  const engine = new Engine(fuzzy, {
+    stepMs: 350,
+    onChange(c, e) {
+      renderer.setState({
+        points,
+        labels: c.labels,
+        centroids: c.centroids,
+        memberships: fuzzy.memberships,
+      });
+      out('iteration').textContent = String(c.metrics.iteration);
+      out('inertia').textContent = Number.isNaN(c.metrics.inertia)
+        ? '·'
+        : c.metrics.inertia.toFixed(3);
+      btn('play').textContent = e.playing ? 'pausar' : 'reproducir';
+      btn('play').disabled = c.converged;
+      probe(hovered);
+    },
+  });
+
+  const hint = root.querySelector<HTMLElement>('[data-hint]')!;
+
+  function probe(i: number) {
+    hovered = i;
+    canvas.style.cursor = i >= 0 ? 'pointer' : 'default';
+    if (i < 0) {
+      out('probe').textContent = 'ninguno';
+      return;
+    }
+    hint.classList.add('is-hidden');
+    const row = fuzzy.memberships[i]!;
+    out('probe').textContent = row
+      .map((u, j) => `${Math.round(u * 100)} % grupo ${j + 1}`)
+      .join(' · ');
+  }
+
+  canvas.addEventListener('pointermove', (ev) => {
+    const q = renderer.eventToData(ev);
+    const tol = renderer.pxToData(10);
+    let bestI = -1;
+    let bestD = tol * tol;
+    for (let i = 0; i < points.length; i++) {
+      const dx = points[i]!.x - q.x;
+      const dy = points[i]!.y - q.y;
+      const d = dx * dx + dy * dy;
+      if (d < bestD) {
+        bestD = d;
+        bestI = i;
+      }
+    }
+    if (bestI !== hovered) probe(bestI);
+  });
+  canvas.addEventListener('pointerleave', () => probe(-1));
+
+  const mInput = root.querySelector<HTMLInputElement>('[data-in="m"]')!;
+  mInput.addEventListener('input', () => {
+    const m = Number(mInput.value);
+    out('m').textContent = m.toFixed(1);
+    // cambia la borrosidad en caliente y deja que reconverja en directo
+    fuzzy.setM(m);
+    engine.play();
+  });
+
+  btn('play').addEventListener('click', () => engine.toggle());
+  btn('reset').addEventListener('click', () => engine.setData(points, k, seed));
+  root.addEventListener('contentvisibilityautostatechange', (ev) => {
+    if ((ev as ContentVisibilityAutoStateChangeEvent).skipped) engine.pause();
+  });
+
+  engine.setData(points, k, seed);
+  engine.play();
+</script>

@@ -1,0 +1,165 @@
+---
+/**
+ * Sala 2.3 — Hartigan-Wong, la pregunta inteligente. Al pasar el ratón sobre
+ * un punto se ve si moverlo a otro grupo reduce o no la función objetivo:
+ * solo se mueve si mejora, aunque el destino no sea el centroide más cercano.
+ */
+---
+
+<section class="section" id="sala-hartigan" aria-labelledby="hartigan-titulo">
+  <div class="prose reveal">
+    <h2 id="hartigan-titulo">Hartigan-Wong, la pregunta inteligente</h2>
+    <p>
+      Las dos variantes anteriores preguntan «¿cuál es el centroide más
+      cercano?». Hartigan-Wong hace una pregunta mejor: «si muevo este punto,
+      <strong>¿baja la función objetivo?</strong>». Mover un punto desplaza
+      <em>dos</em> centroides, el que lo pierde y el que lo gana, y la fórmula
+      tiene en cuenta ambos efectos. Por eso un punto puede quedarse en un
+      grupo cuyo centroide <em>no</em> es el más cercano, y por eso escapa
+      mejor de malos mínimos locales.
+    </p>
+    <p>
+      Pasa el ratón sobre un punto: la línea continua es lo que se ganaría por
+      salir de su grupo; la discontinua, lo que costaría entrar en el mejor
+      candidato. Solo se muda si la ganancia supera al coste.
+    </p>
+  </div>
+
+  <div class="lab reveal">
+    <div class="panel">
+      <div class="canvas-wrap">
+        <canvas aria-label="Visualización de Hartigan-Wong: ganancia y coste de mover cada punto"></canvas>
+        <p class="hint" data-hint>pasa el ratón por un punto</p>
+      </div>
+      <div class="controls">
+        <button class="btn btn-primary" data-action="play">reproducir</button>
+        <button class="btn" data-action="step">paso a paso</button>
+        <button class="btn" data-action="reset">reiniciar</button>
+      </div>
+      <dl class="metrics">
+        <div class="metric">
+          <dt>iteración</dt>
+          <dd data-out="iteration">0</dd>
+        </div>
+        <div class="metric">
+          <dt>Inercia</dt>
+          <dd data-out="inertia">·</dd>
+        </div>
+        <div class="metric">
+          <dt>punto señalado</dt>
+          <dd data-out="probe" style="font-size: 1rem; font-weight: 500;">ninguno</dd>
+        </div>
+      </dl>
+    </div>
+  </div>
+</section>
+
+<script>
+  import { HartiganWong } from '../../lib/algorithms/hartigan-wong.ts';
+  import { anisotropic } from '../../lib/data/datasets.ts';
+  import { Engine } from '../../lib/sim/engine.ts';
+  import { CanvasRenderer } from '../../lib/sim/renderer.ts';
+
+  const root = document.getElementById('sala-hartigan')!;
+  const canvas = root.querySelector('canvas')!;
+  const out = (n: string) => root.querySelector<HTMLElement>(`[data-out="${n}"]`)!;
+  const btn = (a: string) => root.querySelector<HTMLButtonElement>(`[data-action="${a}"]`)!;
+
+  const seed = 12;
+  const points = anisotropic(23, 170);
+  const hw = new HartiganWong();
+  const renderer = new CanvasRenderer(canvas);
+  let hovered = -1;
+
+  const engine = new Engine(hw, {
+    onChange(c, e) {
+      renderer.setState({ points, labels: c.labels, centroids: c.centroids });
+      out('iteration').textContent = String(c.metrics.iteration);
+      out('inertia').textContent = Number.isNaN(c.metrics.inertia)
+        ? '·'
+        : c.metrics.inertia.toFixed(3);
+      btn('play').textContent = e.playing ? 'pausar' : 'reproducir';
+      btn('play').disabled = c.converged;
+      btn('step').disabled = c.converged;
+      probe(hovered); // el veredicto depende del estado actual
+    },
+  });
+
+  const hint = root.querySelector<HTMLElement>('[data-hint]')!;
+
+  /** Muestra ganancia/coste de mover el punto i y dibuja las dos líneas. */
+  function probe(i: number) {
+    hovered = i;
+    canvas.style.cursor = i >= 0 ? 'pointer' : 'default';
+    if (i < 0) {
+      renderer.setOverlay(null);
+      out('probe').textContent = 'ninguno';
+      return;
+    }
+    hint.classList.add('is-hidden');
+    const { gain, costs } = hw.evaluateMove(i);
+    let best = -1;
+    for (let j = 0; j < costs.length; j++) {
+      if (costs[j]! < (best < 0 ? Infinity : costs[best]!)) best = j;
+    }
+    const cost = best < 0 ? Infinity : costs[best]!;
+    const moves = cost < gain;
+    out('probe').textContent =
+      `salir: ${(gain * 1000).toFixed(2)} · entrar: ${(cost * 1000).toFixed(2)} → ` +
+      (moves ? 'se movería' : 'se queda');
+
+    const p = points[i]!;
+    const from = hw.centroids[hw.labels[i]!]!;
+    const to = best >= 0 ? hw.centroids[best]! : null;
+    renderer.setOverlay((ctx, map) => {
+      ctx.lineWidth = 1.5;
+      ctx.strokeStyle = '#1A1A1A';
+      ctx.beginPath();
+      ctx.moveTo(map.x(p.x), map.y(p.y));
+      ctx.lineTo(map.x(from.x), map.y(from.y));
+      ctx.stroke();
+      if (to) {
+        ctx.setLineDash([5, 4]);
+        ctx.strokeStyle = moves ? '#2D5BFF' : '#6B6B6B';
+        ctx.beginPath();
+        ctx.moveTo(map.x(p.x), map.y(p.y));
+        ctx.lineTo(map.x(to.x), map.y(to.y));
+        ctx.stroke();
+        ctx.setLineDash([]);
+      }
+      ctx.beginPath();
+      ctx.arc(map.x(p.x), map.y(p.y), 6, 0, Math.PI * 2);
+      ctx.stroke();
+    });
+  }
+
+  canvas.addEventListener('pointermove', (ev) => {
+    const q = renderer.eventToData(ev);
+    const tol = renderer.pxToData(10);
+    let bestI = -1;
+    let bestD = tol * tol;
+    for (let i = 0; i < points.length; i++) {
+      const dx = points[i]!.x - q.x;
+      const dy = points[i]!.y - q.y;
+      const d = dx * dx + dy * dy;
+      if (d < bestD) {
+        bestD = d;
+        bestI = i;
+      }
+    }
+    if (bestI !== hovered) probe(bestI);
+  });
+  canvas.addEventListener('pointerleave', () => probe(-1));
+
+  btn('step').addEventListener('click', () => {
+    engine.pause();
+    engine.step();
+  });
+  btn('play').addEventListener('click', () => engine.toggle());
+  btn('reset').addEventListener('click', () => engine.setData(points, 3, seed));
+  root.addEventListener('contentvisibilityautostatechange', (ev) => {
+    if ((ev as ContentVisibilityAutoStateChangeEvent).skipped) engine.pause();
+  });
+
+  engine.setData(points, 3, seed);
+</script>

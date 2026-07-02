@@ -1,0 +1,45 @@
+---
+import Base from '../layouts/Base.astro';
+import Nav from '../components/Nav.astro';
+import Apertura from '../components/sections/Apertura.astro';
+import Fundamento from '../components/sections/Fundamento.astro';
+import SalaLloyd from '../components/sections/SalaLloyd.astro';
+import SalaMacQueen from '../components/sections/SalaMacQueen.astro';
+import SalaHartigan from '../components/sections/SalaHartigan.astro';
+import SalaElkan from '../components/sections/SalaElkan.astro';
+import SalaFuzzy from '../components/sections/SalaFuzzy.astro';
+import Arena from '../components/sections/Arena.astro';
+import Guia from '../components/sections/Guia.astro';
+---
+
+<Base>
+  <Nav />
+  <Apertura />
+  <Fundamento />
+  <SalaLloyd />
+  <SalaMacQueen />
+  <SalaHartigan />
+  <SalaElkan />
+  <SalaFuzzy />
+  <Arena />
+  <Guia />
+
+  <footer class="cierre">
+    <div class="prose">
+      <p class="caption">
+        K-Means Explorable: Lloyd · MacQueen · Hartigan-Wong · Elkan · Fuzzy.
+        Proyecto para la asignatura <em>Aprendizaje Automático No Supervisado</em>
+        (Tema 3). Hecho con Astro y TypeScript, sin frameworks de UI; los cinco
+        algoritmos están implementados fieles al temario y verificados con
+        comprobaciones de fidelidad.
+      </p>
+    </div>
+  </footer>
+</Base>
+
+<style>
+  .cierre {
+    border-top: 1px solid var(--line);
+    padding-block: 48px;
+  }
+</style>

@@ -1,0 +1,675 @@
+---
+/**
+ * Sección 1 — El fundamento común. Sandbox con el K-Means base (Lloyd):
+ * arranque aleatorio de centroides, cada iteración partida en sus dos fases
+ * (asignación / actualización) con narración en un recuadro, y una línea de
+ * tiempo para recorrer la ejecución adelante y atrás.
+ */
+---
+
+<section class="section" id="fundamento" aria-labelledby="fundamento-titulo">
+  <div class="intro reveal">
+    <h2 id="fundamento-titulo">El fundamento común</h2>
+    <p>
+      Todo K-Means juega la misma partida: elegir <em>k</em> puntos de
+      referencia, los <strong>centroides</strong>, y repetir un ciclo de dos
+      movimientos. Primero la <strong>asignación</strong>: cada punto se apunta
+      al centroide que tiene más cerca. Después la
+      <strong>actualización</strong>: cada centroide se muda al centro de
+      gravedad de los puntos que lo eligieron. Cuando los centroides dejan de
+      moverse, el algoritmo ha llegado a la <strong>convergencia</strong>.
+    </p>
+    <p>
+      Aquí los centroides empiezan en <strong>posiciones aleatorias</strong>,
+      lejos de su sitio, para que puedas ver el ciclo trabajar. Recorre la
+      ejecución con las flechas y lee en el recuadro qué hace cada fase.
+      Puedes añadir puntos con un clic, arrastrarlos, o
+      <strong>agarrar un centroide</strong> y dejarlo donde quieras: la
+      ejecución continúa desde ahí. Cuando lo tengas dominado, sigue bajando:
+      hay cinco formas distintas de ejecutar este mismo ciclo.
+    </p>
+  </div>
+
+  <div class="lab reveal">
+    <div class="panel">
+      <div class="controls toolbar">
+        <div class="seg" role="group" aria-label="forma de los datos">
+          <button class="seg-btn" data-shape="redondos" aria-pressed="true">redondos</button>
+          <button class="seg-btn" data-shape="alargados" aria-pressed="false">alargados</button>
+          <button class="seg-btn" data-shape="desiguales" aria-pressed="false">desiguales</button>
+          <button class="seg-btn" data-shape="lunas" aria-pressed="false">lunas</button>
+        </div>
+        <button class="btn" data-action="regen">otra muestra</button>
+        <label class="field">
+          k = <output data-out="k">3</output>
+          <input type="range" min="2" max="6" step="1" value="3" data-in="k" aria-label="número de grupos k" />
+        </label>
+      </div>
+      <div class="canvas-wrap">
+        <canvas aria-label="Sandbox interactivo de K-Means: los puntos se agrupan alrededor de los centroides"></canvas>
+        <p class="hint" data-hint>arrastra puntos o centroides · clic para añadir un punto</p>
+      </div>
+      <div class="controls timeline">
+        <button class="btn btn-primary" data-action="play">reproducir</button>
+        <button class="btn arrow" data-action="back" aria-label="fase anterior">←</button>
+        <input
+          type="range"
+          min="0"
+          max="0"
+          step="1"
+          value="0"
+          data-in="pos"
+          aria-label="posición en la ejecución (también responde a las flechas del teclado)"
+        />
+        <button class="btn arrow" data-action="step" aria-label="fase siguiente">→</button>
+        <output class="caption" data-out="pos-label">paso 0 de 0</output>
+        <button class="btn" data-action="reset">reiniciar</button>
+      </div>
+      <div class="narration-box">
+        <span class="phase-chip" data-out="phase">inicio</span>
+        <p class="narration" data-out="narration">·</p>
+      </div>
+      <dl class="metrics">
+        <div class="metric">
+          <dt>iteración</dt>
+          <dd data-out="iteration">0</dd>
+        </div>
+        <div class="metric">
+          <dt>Inercia</dt>
+          <dd data-out="inertia">·</dd>
+        </div>
+        <div class="metric">
+          <dt>estado</dt>
+          <dd data-out="status">listo</dd>
+        </div>
+      </dl>
+    </div>
+  </div>
+</section>
+
+<style>
+  /* el texto acompaña al panel: misma columna, alineado a su borde */
+  .intro {
+    max-width: 860px;
+    margin-inline: auto;
+    padding-inline: 24px;
+    margin-block-end: 48px;
+  }
+
+  .intro p {
+    max-width: 70ch;
+  }
+
+  /* selector segmentado */
+  .seg {
+    display: inline-flex;
+    border: 1px solid var(--line);
+    background: var(--surface);
+  }
+
+  .seg-btn {
+    font: inherit;
+    font-size: 0.9rem;
+    padding: 8px 14px;
+    border: none;
+    background: transparent;
+    color: var(--ink-soft);
+    cursor: pointer;
+    transition: color 120ms ease, background-color 120ms ease;
+  }
+
+  .seg-btn + .seg-btn {
+    border-left: 1px solid var(--line);
+  }
+
+  .seg-btn:hover:not([aria-pressed='true']) {
+    color: var(--ink);
+  }
+
+  .seg-btn:focus-visible {
+    outline: 2px solid var(--accent);
+    outline-offset: -2px;
+  }
+
+  .seg-btn[aria-pressed='true'] {
+    background: rgb(45 91 255 / 0.08);
+    color: var(--accent);
+    font-weight: 600;
+  }
+
+  .toolbar .field {
+    margin-left: auto;
+  }
+
+  /* línea de tiempo con pista rellena hasta la posición actual */
+  .timeline input[type='range'] {
+    flex: 1;
+    min-width: 100px;
+    appearance: none;
+    height: 4px;
+    border-radius: 2px;
+    background: linear-gradient(
+      to right,
+      var(--accent) var(--p, 0%),
+      var(--line) var(--p, 0%)
+    );
+  }
+
+  .timeline input[type='range']::-webkit-slider-thumb {
+    appearance: none;
+    width: 14px;
+    height: 14px;
+    border-radius: 50%;
+    background: var(--accent);
+    border: 2px solid #fff;
+    box-shadow: 0 0 0 1px var(--line);
+  }
+
+  .timeline input[type='range']::-moz-range-thumb {
+    width: 12px;
+    height: 12px;
+    border-radius: 50%;
+    background: var(--accent);
+    border: 2px solid #fff;
+    box-shadow: 0 0 0 1px var(--line);
+  }
+
+  .timeline output {
+    font-variant-numeric: tabular-nums;
+    white-space: nowrap;
+  }
+
+  .arrow {
+    padding: 8px 14px;
+  }
+
+  /* recuadro que narra la fase actual */
+  .narration-box {
+    display: flex;
+    align-items: baseline;
+    gap: 14px;
+    margin: 0 16px 16px;
+    padding: 14px 18px;
+    background: rgb(45 91 255 / 0.045);
+    border: 1px solid rgb(45 91 255 / 0.16);
+    border-left: 3px solid var(--accent);
+  }
+
+  .phase-chip {
+    flex-shrink: 0;
+    font-size: 0.7rem;
+    font-weight: 650;
+    letter-spacing: 0.09em;
+    text-transform: uppercase;
+    color: var(--accent);
+    border: 1px solid currentColor;
+    padding: 2px 9px;
+  }
+
+  .narration {
+    margin: 0;
+    font-size: 0.95rem;
+    min-height: 2.9em;
+  }
+
+  @media (max-width: 640px) {
+    .narration-box {
+      flex-direction: column;
+      gap: 8px;
+    }
+  }
+</style>
+
+<script>
+  import { Lloyd } from '../../lib/algorithms/lloyd.ts';
+  import { inertia, mulberry32 } from '../../lib/algorithms/kmeans-base.ts';
+  import type { Point } from '../../lib/algorithms/types.ts';
+  import { blobs, anisotropic, unevenDensities, moons } from '../../lib/data/datasets.ts';
+  import { CanvasRenderer } from '../../lib/sim/renderer.ts';
+
+  const root = document.getElementById('fundamento')!;
+  const canvas = root.querySelector('canvas')!;
+  const out = (n: string) => root.querySelector<HTMLElement>(`[data-out="${n}"]`)!;
+  const btn = (a: string) => root.querySelector<HTMLButtonElement>(`[data-action="${a}"]`)!;
+  const hint = root.querySelector<HTMLElement>('[data-hint]')!;
+  const posInput = root.querySelector<HTMLInputElement>('[data-in="pos"]')!;
+  const kInput = root.querySelector<HTMLInputElement>('[data-in="k"]')!;
+
+  const SHAPES: Record<string, (seed: number, n: number) => Point[]> = {
+    redondos: blobs,
+    alargados: anisotropic,
+    desiguales: unevenDensities,
+    lunas: moons,
+  };
+
+  const seed = 7;
+  let shape = 'redondos';
+  let dataSeed = 21;
+  let k = 3;
+  let points: Point[] = SHAPES[shape]!(dataSeed, 150);
+
+  const lloyd = new Lloyd();
+  const renderer = new CanvasRenderer(canvas);
+  const accent =
+    getComputedStyle(canvas).getPropertyValue('--accent').trim() || '#2D5BFF';
+
+  // ---- historial: cada fase de cada iteración es un fotograma ----
+  type Phase = 'inicio' | 'asignacion' | 'actualizacion';
+  const PHASE_LABEL: Record<Phase, string> = {
+    inicio: 'inicio',
+    asignacion: 'asignación',
+    actualizacion: 'actualización',
+  };
+  interface Snap {
+    labels: number[];
+    centroids: Point[];
+    iteration: number;
+    distanceComputations: number;
+    inertia: number;
+    converged: boolean;
+    phase: Phase;
+    changed: number[]; // puntos que cambiaron de grupo (fase de asignación)
+    moved: number; // desplazamiento máximo de centroide (fase de actualización)
+  }
+  let history: Snap[] = [];
+  let pos = 0;
+
+  const fromLloyd = (phase: Phase, changed: number[], moved: number): Snap => ({
+    labels: [...lloyd.labels],
+    centroids: lloyd.centroids.map((c) => ({ ...c })),
+    iteration: lloyd.metrics.iteration,
+    distanceComputations: lloyd.metrics.distanceComputations,
+    inertia: lloyd.metrics.inertia,
+    converged: lloyd.converged,
+    phase,
+    changed,
+    moved,
+  });
+
+  /** Devuelve el algoritmo al estado de un fotograma (para ramificar desde él). */
+  const restore = (s: Snap) => {
+    lloyd.labels = [...s.labels];
+    lloyd.centroids = s.centroids.map((c) => ({ ...c }));
+    lloyd.metrics = {
+      iteration: s.iteration,
+      distanceComputations: s.distanceComputations,
+      inertia: s.inertia,
+    };
+    lloyd.converged = s.converged;
+  };
+
+  const current = () => history[pos]!;
+  const last = () => history[history.length - 1]!;
+
+  /** Calcula una iteración nueva y la guarda como dos fotogramas (fases). */
+  function computeIteration() {
+    const prevLabels = [...lloyd.labels];
+    const oldCentroids = lloyd.centroids.map((c) => ({ ...c }));
+    lloyd.step();
+    // en la primera asignación nadie "cambia" de grupo: todos lo estrenan
+    const changed: number[] = [];
+    lloyd.labels.forEach((l, i) => {
+      if (prevLabels[i] !== undefined && prevLabels[i]! >= 0 && l !== prevLabels[i]) changed.push(i);
+    });
+    let moved = 0;
+    lloyd.centroids.forEach((c, j) => {
+      const o = oldCentroids[j]!;
+      moved = Math.max(moved, Math.hypot(c.x - o.x, c.y - o.y));
+    });
+    // fase A: los puntos ya eligieron, los centroides aún no se han movido
+    history.push({
+      labels: [...lloyd.labels],
+      centroids: oldCentroids,
+      iteration: lloyd.metrics.iteration,
+      distanceComputations: lloyd.metrics.distanceComputations,
+      inertia: inertia(points, oldCentroids, lloyd.labels),
+      converged: false,
+      phase: 'asignacion',
+      changed,
+      moved: 0,
+    });
+    // fase B: los centroides saltan a la media de su grupo
+    history.push(fromLloyd('actualizacion', [], moved));
+  }
+
+  function narration(): string {
+    const s = current();
+    if (s.phase === 'inicio') {
+      return (
+        `${s.centroids.length} centroides colocados al azar, todavía sin puntos ` +
+        `asignados. La ejecución completa tiene ${history.length - 1} pasos: ` +
+        'recórrela con las flechas o pulsa reproducir.'
+      );
+    }
+    if (s.phase === 'asignacion') {
+      if (s.iteration === 1) {
+        return 'Cada punto se apunta al centroide más cercano y recibe su primer color. Los centroides todavía no se han movido.';
+      }
+      const n = s.changed.length;
+      return (
+        'Cada punto vuelve a elegir el centroide más cercano. ' +
+        (n === 0
+          ? 'Ningún punto cambia de grupo: la partición ya es estable.'
+          : n === 1
+            ? '1 punto cambia de grupo (marcado con un aro).'
+            : `${n} puntos cambian de grupo (marcados con un aro).`)
+      );
+    }
+    const conv = s.converged
+      ? ' El movimiento queda por debajo de la tolerancia: <strong>convergido</strong>.'
+      : '';
+    return (
+      'Cada centroide salta a la media de los puntos que lo eligieron ' +
+      `(desplazamiento máximo ${s.moved.toFixed(3)}).` +
+      conv
+    );
+  }
+
+  function display(animate = true) {
+    const s = current();
+    renderer.setState({ points, labels: s.labels, centroids: s.centroids }, animate);
+    const total = history.length - 1;
+    posInput.max = String(total);
+    posInput.value = String(pos);
+    posInput.style.setProperty('--p', `${total > 0 ? (pos / total) * 100 : 0}%`);
+    out('pos-label').textContent = `paso ${pos} de ${total}`;
+    out('phase').textContent =
+      s.phase === 'actualizacion' || s.phase === 'asignacion'
+        ? `iteración ${s.iteration} · ${PHASE_LABEL[s.phase]}`
+        : PHASE_LABEL[s.phase];
+    out('narration').innerHTML = narration();
+    out('iteration').textContent = String(s.iteration);
+    out('inertia').textContent = Number.isNaN(s.inertia) ? '·' : s.inertia.toFixed(3);
+    out('status').textContent =
+      s.converged && pos === history.length - 1
+        ? 'convergido'
+        : playing
+          ? 'en marcha'
+          : pos === 0 && s.phase === 'inicio'
+            ? 'listo'
+            : pos < history.length - 1
+              ? 'repasando'
+              : 'pausado';
+    const atEnd = pos === history.length - 1 && last().converged;
+    btn('play').textContent = playing ? 'pausar' : 'reproducir';
+    btn('play').disabled = atEnd;
+    btn('step').disabled = atEnd;
+    btn('back').disabled = pos === 0;
+  }
+
+  /** Calcula la ejecución completa desde el estado actual del algoritmo. */
+  function computeRun() {
+    let guard = 0;
+    while (!lloyd.converged && guard++ < 120) computeIteration();
+  }
+
+  /** Avanza un fotograma por la ejecución ya calculada. */
+  function forward(animate = true): boolean {
+    if (pos >= history.length - 1) return false;
+    pos++;
+    display(animate);
+    return true;
+  }
+
+  function back() {
+    if (pos === 0) return;
+    pos--;
+    display();
+  }
+
+  // ---- reproducir ----
+  let playing = false;
+  let timer: ReturnType<typeof setTimeout> | null = null;
+
+  function stopPlay() {
+    playing = false;
+    if (timer) clearTimeout(timer);
+    timer = null;
+  }
+
+  function play() {
+    if (playing) return;
+    playing = true;
+    const loop = () => {
+      if (!playing) return;
+      if (forward()) timer = setTimeout(loop, 650);
+      else stopPlay();
+      display();
+    };
+    loop();
+  }
+
+  function reinit() {
+    stopPlay();
+    lloyd.init(points, k, seed + dataSeed);
+    // arranque aleatorio y reproducible: lejos de su sitio, para que el ciclo
+    // tenga recorrido y se vea trabajar (k-means++ acierta demasiado)
+    const rand = mulberry32((seed + dataSeed) * 9973 + k);
+    for (let j = 0; j < lloyd.centroids.length; j++) {
+      lloyd.centroids[j] = { x: 0.08 + rand() * 0.84, y: 0.08 + rand() * 0.84 };
+    }
+    history = [fromLloyd('inicio', [], 0)];
+    pos = 0;
+    // la ejecución entera se calcula ya: la línea de tiempo siempre está completa
+    computeRun();
+    display(false);
+  }
+
+  // ---- controles ----
+  btn('play').addEventListener('click', () => {
+    if (playing) {
+      stopPlay();
+      display();
+    } else {
+      play();
+    }
+  });
+  btn('step').addEventListener('click', () => {
+    stopPlay();
+    forward();
+  });
+  btn('back').addEventListener('click', () => {
+    stopPlay();
+    back();
+  });
+  btn('reset').addEventListener('click', reinit);
+  btn('regen').addEventListener('click', () => {
+    dataSeed++;
+    points = SHAPES[shape]!(dataSeed, 150);
+    reinit();
+  });
+
+  posInput.addEventListener('input', () => {
+    stopPlay();
+    pos = Number(posInput.value);
+    display(false);
+  });
+
+  kInput.addEventListener('input', () => {
+    k = Number(kInput.value);
+    out('k').textContent = kInput.value;
+    reinit();
+  });
+
+  for (const b of root.querySelectorAll<HTMLButtonElement>('.seg-btn')) {
+    b.addEventListener('click', () => {
+      shape = b.dataset.shape!;
+      for (const other of root.querySelectorAll('.seg-btn')) {
+        other.setAttribute('aria-pressed', String(other === b));
+      }
+      points = SHAPES[shape]!(dataSeed, 150);
+      reinit();
+    });
+  }
+
+  // flechas del teclado: funcionan siempre que la sección esté a la vista,
+  // sin necesidad de enfocar la barra
+  let inView = false;
+  new IntersectionObserver(
+    (entries) => {
+      for (const e of entries) inView = e.isIntersecting;
+    },
+    { threshold: 0.25 },
+  ).observe(root);
+
+  document.addEventListener('keydown', (ev) => {
+    if (!inView || (ev.key !== 'ArrowLeft' && ev.key !== 'ArrowRight')) return;
+    const t = ev.target as HTMLElement;
+    // no interceptar otros controles (p. ej. el deslizador de k)
+    if (t instanceof HTMLInputElement && t !== posInput) return;
+    ev.preventDefault();
+    stopPlay();
+    if (ev.key === 'ArrowRight') forward();
+    else back();
+  });
+
+  // ---- interacción con el lienzo: centroides primero, luego puntos ----
+  const clamp01 = (v: number) => Math.min(0.98, Math.max(0.02, v));
+  let dragCentroid = -1;
+  let dragPoint = -1;
+  let hoverCentroid = -1;
+
+  const hitCentroid = (p: Point) => {
+    const tol = renderer.pxToData(14);
+    let best = -1;
+    let bestD = tol * tol;
+    current().centroids.forEach((c, j) => {
+      const d = (c.x - p.x) ** 2 + (c.y - p.y) ** 2;
+      if (d < bestD) {
+        bestD = d;
+        best = j;
+      }
+    });
+    return best;
+  };
+
+  const hitPoint = (p: Point) => {
+    const tol = renderer.pxToData(11);
+    let best = -1;
+    let bestD = tol * tol;
+    points.forEach((q, i) => {
+      const d = (q.x - p.x) ** 2 + (q.y - p.y) ** 2;
+      if (d < bestD) {
+        bestD = d;
+        best = i;
+      }
+    });
+    return best;
+  };
+
+  // capa de dibujo extra: aros en los puntos que cambian + resalte del
+  // centroide bajo el ratón
+  renderer.setOverlay((ctx, map) => {
+    const s = current();
+    if (s.phase === 'asignacion' && s.changed.length > 0) {
+      ctx.lineWidth = 1.2;
+      ctx.strokeStyle = 'rgb(26 26 26 / 0.55)';
+      for (const i of s.changed) {
+        const q = points[i];
+        if (!q) continue;
+        ctx.beginPath();
+        ctx.arc(map.x(q.x), map.y(q.y), 6.5, 0, Math.PI * 2);
+        ctx.stroke();
+      }
+    }
+    if (hoverCentroid >= 0) {
+      const c = s.centroids[hoverCentroid];
+      if (c) {
+        ctx.beginPath();
+        ctx.arc(map.x(c.x), map.y(c.y), 13, 0, Math.PI * 2);
+        ctx.lineWidth = 2;
+        ctx.strokeStyle = accent;
+        ctx.stroke();
+      }
+    }
+  });
+
+  function setHoverCentroid(j: number) {
+    if (j === hoverCentroid) return;
+    hoverCentroid = j;
+    display(false); // repinta con o sin anillo
+  }
+
+  canvas.addEventListener('pointerdown', (ev) => {
+    hint.classList.add('is-hidden');
+    stopPlay();
+    const p = renderer.eventToData(ev);
+    const cIdx = hitCentroid(p);
+    if (cIdx >= 0) {
+      // agarrar un centroide abre una rama nueva desde el fotograma visible
+      restore(current());
+      history = history.slice(0, pos + 1);
+      dragCentroid = cIdx;
+      canvas.style.cursor = 'grabbing';
+      canvas.setPointerCapture(ev.pointerId);
+      return;
+    }
+    const pIdx = hitPoint(p);
+    if (pIdx >= 0) {
+      dragPoint = pIdx;
+      canvas.style.cursor = 'grabbing';
+      canvas.setPointerCapture(ev.pointerId);
+    } else {
+      points.push({ x: clamp01(p.x), y: clamp01(p.y) });
+      reinit();
+    }
+  });
+
+  canvas.addEventListener('pointermove', (ev) => {
+    const p = renderer.eventToData(ev);
+    if (dragCentroid >= 0) {
+      lloyd.centroids[dragCentroid] = { x: clamp01(p.x), y: clamp01(p.y) };
+      lloyd.converged = false;
+      lloyd.metrics.inertia = inertia(points, lloyd.centroids, lloyd.labels);
+      history[pos] = fromLloyd(current().phase, [], 0);
+      display(false);
+      return;
+    }
+    if (dragPoint >= 0) {
+      points[dragPoint] = { x: clamp01(p.x), y: clamp01(p.y) };
+      display(false);
+      return;
+    }
+    const cIdx = hitCentroid(p);
+    setHoverCentroid(cIdx);
+    canvas.style.cursor = cIdx >= 0 || hitPoint(p) >= 0 ? 'grab' : 'crosshair';
+  });
+
+  canvas.addEventListener('pointerup', () => {
+    if (dragCentroid >= 0) {
+      dragCentroid = -1;
+      canvas.style.cursor = 'grab';
+      // el futuro de la rama nueva se calcula entero desde el centroide movido
+      computeRun();
+      display();
+      return;
+    }
+    if (dragPoint >= 0) {
+      dragPoint = -1;
+      canvas.style.cursor = 'grab';
+      reinit(); // los datos cambiaron: la ejecución empieza de cero
+    }
+  });
+
+  canvas.addEventListener('pointerleave', () => setHoverCentroid(-1));
+  canvas.style.cursor = 'crosshair';
+
+  // pausa la simulación cuando el navegador deja de renderizar la sección
+  root.addEventListener('contentvisibilityautostatechange', (ev) => {
+    if ((ev as ContentVisibilityAutoStateChangeEvent).skipped) {
+      stopPlay();
+      display();
+    }
+  });
+
+  // pequeño asidero para verificación end-to-end
+  (window as unknown as Record<string, unknown>).__labFundamento = {
+    centroids: () => current().centroids.map((c) => ({ ...c })),
+    pos: () => pos,
+    length: () => history.length,
+    phase: () => current().phase,
+    pad: 20,
+  };
+
+  reinit();
+</script>

@@ -1,0 +1,128 @@
+---
+/**
+ * Sala 2.2 — MacQueen, el modo online. Los puntos entran de uno en uno y el
+ * centroide afectado se desplaza al instante. "Barajar orden" demuestra la
+ * sensibilidad al orden de llegada, algo que a Lloyd no le pasa.
+ */
+---
+
+<section class="section" id="sala-macqueen" aria-labelledby="macqueen-titulo">
+  <div class="prose reveal">
+    <h2 id="macqueen-titulo">MacQueen, el modo online</h2>
+    <p>
+      MacQueen no espera a nadie: procesa los puntos <strong>uno a uno</strong>
+      y, en cuanto un punto se une a un grupo, ese centroide se recalcula
+      <em>al instante</em> (media incremental). Por eso es ideal para datos que
+      llegan en <strong>flujo continuo</strong>.
+    </p>
+    <p>
+      Haz clic en el lienzo: cada punto que sueltes arrastra consigo a su
+      centroide. Y hay un precio: al decidir sobre la marcha, el
+      <strong>orden de llegada importa</strong>. Pulsa <em>barajar orden</em>
+      para rehacer el agrupamiento con los mismos datos en otro orden y puede
+      salir otra cosa. A Lloyd, que trabaja por lotes, eso no le pasa.
+    </p>
+  </div>
+
+  <div class="lab reveal">
+    <div class="panel">
+      <div class="canvas-wrap">
+        <canvas aria-label="Sandbox online de MacQueen: cada punto nuevo desplaza su centroide al instante"></canvas>
+        <p class="hint" data-hint>haz clic para soltar un punto nuevo</p>
+      </div>
+      <div class="controls">
+        <button class="btn btn-primary" data-action="shuffle">barajar orden</button>
+        <button class="btn" data-action="reset">reiniciar</button>
+      </div>
+      <dl class="metrics">
+        <div class="metric">
+          <dt>puntos</dt>
+          <dd data-out="count">0</dd>
+        </div>
+        <div class="metric">
+          <dt>Inercia</dt>
+          <dd data-out="inertia">·</dd>
+        </div>
+        <div class="metric">
+          <dt>frente al orden original</dt>
+          <dd data-out="verdict">·</dd>
+        </div>
+      </dl>
+    </div>
+  </div>
+</section>
+
+<script>
+  import { MacQueen } from '../../lib/algorithms/macqueen.ts';
+  import type { Point } from '../../lib/algorithms/types.ts';
+  import { unevenDensities } from '../../lib/data/datasets.ts';
+  import { CanvasRenderer } from '../../lib/sim/renderer.ts';
+
+  const root = document.getElementById('sala-macqueen')!;
+  const canvas = root.querySelector('canvas')!;
+  const out = (n: string) => root.querySelector<HTMLElement>(`[data-out="${n}"]`)!;
+  const btn = (a: string) => root.querySelector<HTMLButtonElement>(`[data-action="${a}"]`)!;
+
+  const seed = 9;
+  const k = 4;
+  const base = unevenDensities(17, 140);
+  let points: Point[] = [];
+  let mq = new MacQueen();
+  let shuffleSeed = 100;
+  let originalLabels: number[] = [];
+  const renderer = new CanvasRenderer(canvas);
+
+  function runToEnd(m: MacQueen) {
+    let guard = 0;
+    while (m.step() && guard++ < 200);
+  }
+
+  function refresh(verdict = '·') {
+    out('count').textContent = String(points.length);
+    out('inertia').textContent = Number.isNaN(mq.metrics.inertia)
+      ? '·'
+      : mq.metrics.inertia.toFixed(3);
+    out('verdict').textContent = verdict;
+    renderer.setState({ points, labels: mq.labels, centroids: mq.centroids });
+  }
+
+  function reset() {
+    points = base.map((p) => ({ ...p }));
+    mq = new MacQueen();
+    mq.init(points, k, seed);
+    runToEnd(mq);
+    originalLabels = [...mq.labels];
+    shuffleSeed = 100;
+    refresh('orden original');
+  }
+
+  btn('reset').addEventListener('click', reset);
+
+  btn('shuffle').addEventListener('click', () => {
+    // mismos datos, misma inicialización, distinto orden de llegada
+    const data = points.map((p) => ({ ...p }));
+    const rerun = new MacQueen();
+    rerun.init(data, k, seed);
+    rerun.shuffleOrder(++shuffleSeed);
+    runToEnd(rerun);
+    const same =
+      rerun.labels.length === originalLabels.length &&
+      rerun.labels.every((l, i) => l === originalLabels[i]);
+    points = data;
+    mq = rerun;
+    refresh(same ? 'mismo resultado' : 'resultado distinto');
+  });
+
+  // ingesta online: cada clic añade un punto y su centroide se desplaza ya
+  const clamp01 = (v: number) => Math.min(0.98, Math.max(0.02, v));
+  const hint = root.querySelector<HTMLElement>('[data-hint]')!;
+  canvas.addEventListener('pointerdown', (ev) => {
+    hint.classList.add('is-hidden');
+    const p = renderer.eventToData(ev);
+    mq.addPoint({ x: clamp01(p.x), y: clamp01(p.y) });
+    refresh('·');
+  });
+  canvas.style.cursor = 'crosshair';
+
+  reset();
+</script>

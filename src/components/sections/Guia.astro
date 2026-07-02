@@ -1,0 +1,136 @@
+---
+/**
+ * Sección 4 — La guía de decisión. Convierte lo explorado en una conclusión
+ * útil: "si tus datos son X → usa Y, porque Z", enlazando de vuelta a la sala.
+ */
+const GUIA = [
+  {
+    id: 'general',
+    situacion: 'datos estáticos, caso general',
+    variante: 'Lloyd',
+    sala: '#sala-lloyd',
+    porque:
+      'Actualiza por lotes: el más simple, predecible y fácil de razonar. Si ninguna de las otras situaciones te describe, empieza aquí: es la línea base sobre la que se mide todo lo demás.',
+  },
+  {
+    id: 'flujo',
+    situacion: 'los datos llegan en flujo continuo',
+    variante: 'MacQueen',
+    sala: '#sala-macqueen',
+    porque:
+      'Procesa los puntos de uno en uno y ajusta los centroides sobre la marcha, así que no necesita esperar al lote completo y suele converger en menos pasadas. A cambio, el orden de llegada puede cambiar el resultado.',
+  },
+  {
+    id: 'calidad',
+    situacion: 'la calidad del agrupamiento es lo primero',
+    variante: 'Hartigan-Wong',
+    sala: '#sala-hartigan',
+    porque:
+      'No pregunta «¿cuál está más cerca?» sino «¿esto mejora la función objetivo?». Esa pregunta más cara le permite escapar de malos mínimos locales donde Lloyd se queda atascado.',
+  },
+  {
+    id: 'grande',
+    situacion: 'el dataset es enorme y el coste importa',
+    variante: 'Elkan',
+    sala: '#sala-elkan',
+    porque:
+      'Da exactamente el mismo resultado que Lloyd, pero descarta centroides con la desigualdad triangular sin llegar a medirlos. El ahorro de cálculos crece con el tamaño de los datos.',
+  },
+  {
+    id: 'difuso',
+    situacion: 'las fronteras entre grupos no están claras',
+    variante: 'Fuzzy / Soft K-Means',
+    sala: '#sala-fuzzy',
+    porque:
+      'Sustituye la etiqueta rígida por grados de pertenencia: un punto puede ser 70 % de un grupo y 30 % de otro. Más costoso, pero robusto ante solapes, ruido y casos ambiguos.',
+  },
+];
+---
+
+<section class="section" id="guia" aria-labelledby="guia-titulo">
+  <div class="prose reveal">
+    <h2 id="guia-titulo">¿Cuál elijo?</h2>
+    <p>
+      La pregunta del principio ya tiene respuesta: existen cinco versiones
+      porque <strong>ninguna gana siempre</strong>. Cada una paga un precio
+      distinto (simplicidad, orden, cálculo, rigidez) a cambio de una virtud
+      distinta. Elegir bien es cuestión de saber qué forma tienen tus datos y
+      qué te importa más.
+    </p>
+    <p>Indica tu situación:</p>
+  </div>
+
+  <div class="lab reveal">
+    <div class="controls">
+      {
+        GUIA.map((g) => (
+          <button class="btn situacion" data-g={g.id} aria-pressed="false">
+            {g.situacion}
+          </button>
+        ))
+      }
+    </div>
+    {
+      GUIA.map((g) => (
+        <article class="ficha" data-card={g.id} hidden>
+          <h3>usa {g.variante}</h3>
+          <p>{g.porque}</p>
+          <a href={g.sala}>volver a su sala ↑</a>
+        </article>
+      ))
+    }
+    <p class="caption placeholder" data-placeholder>
+      la recomendación aparecerá aquí
+    </p>
+  </div>
+</section>
+
+<style>
+  .situacion[aria-pressed='true'] {
+    border-color: var(--accent);
+    color: var(--accent);
+  }
+
+  .ficha {
+    border: 1px solid var(--line);
+    border-left: 3px solid var(--accent);
+    background: var(--surface);
+    padding: 24px 28px;
+    max-width: 62ch;
+  }
+
+  .ficha h3 {
+    margin-block: 0 8px;
+    font-size: 1.25rem;
+  }
+
+  .ficha p {
+    margin-block-end: 12px;
+  }
+
+  .ficha a {
+    color: var(--accent);
+    font-size: 0.95rem;
+  }
+
+  .placeholder {
+    padding: 24px 28px;
+    border: 1px dashed var(--line);
+    max-width: 62ch;
+  }
+</style>
+
+<script>
+  const root = document.getElementById('guia')!;
+  const buttons = root.querySelectorAll<HTMLButtonElement>('.situacion');
+  const cards = root.querySelectorAll<HTMLElement>('[data-card]');
+  const placeholder = root.querySelector<HTMLElement>('[data-placeholder]')!;
+
+  for (const b of buttons) {
+    b.addEventListener('click', () => {
+      placeholder.hidden = true;
+      for (const other of buttons) other.setAttribute('aria-pressed', String(other === b));
+      for (const card of cards) card.hidden = card.dataset.card !== b.dataset.g;
+    });
+  }
+</script>

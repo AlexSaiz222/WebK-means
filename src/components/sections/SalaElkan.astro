@@ -1,0 +1,210 @@
+---
+/**
+ * Sala 2.4 — Elkan, el ahorro invisible. Da el mismo resultado que Lloyd, así
+ * que su historia se cuenta con dos contadores de distancias en paralelo y una
+ * ilustración de la desigualdad triangular. El momento "ajá" del proyecto.
+ */
+---
+
+<section class="section" id="sala-elkan" aria-labelledby="elkan-titulo">
+  <div class="prose reveal">
+    <h2 id="elkan-titulo">Elkan, el ahorro invisible</h2>
+    <p>
+      Elkan produce <strong>exactamente el mismo resultado</strong> que Lloyd.
+      Su historia no está en los grupos: está en el trabajo que se ahorra.
+      Mantiene límites superior e inferior de cada distancia y usa la
+      <strong>desigualdad triangular</strong> para descartar centroides
+      <em>sin llegar a medirlos</em>. Misma respuesta con muchos menos
+      cálculos, y esa diferencia se dispara en datasets grandes.
+    </p>
+  </div>
+
+  <div class="lab reveal">
+    <div class="panel">
+      <div class="race">
+        <figure>
+          <figcaption class="caption">Lloyd</figcaption>
+          <canvas data-canvas="lloyd" aria-label="Lloyd sobre los datos de la comparación"></canvas>
+        </figure>
+        <figure>
+          <figcaption class="caption">Elkan</figcaption>
+          <canvas data-canvas="elkan" aria-label="Elkan sobre los mismos datos y semilla"></canvas>
+        </figure>
+      </div>
+      <div class="controls">
+        <button class="btn btn-primary" data-action="play">reproducir</button>
+        <button class="btn" data-action="step">paso a paso</button>
+        <button class="btn" data-action="reset">reiniciar</button>
+      </div>
+      <dl class="metrics">
+        <div class="metric">
+          <dt>distancias · Lloyd</dt>
+          <dd data-out="lloyd-comps">0</dd>
+        </div>
+        <div class="metric">
+          <dt>distancias · Elkan</dt>
+          <dd data-out="elkan-comps">0</dd>
+        </div>
+        <div class="metric">
+          <dt>ahorro</dt>
+          <dd data-out="saving">·</dd>
+        </div>
+        <div class="metric">
+          <dt>mismas etiquetas</dt>
+          <dd data-out="same">·</dd>
+        </div>
+      </dl>
+    </div>
+  </div>
+
+  <div class="prose reveal">
+    <figure class="triangulo">
+      <svg viewBox="0 0 420 230" role="img" aria-label="Ilustración de la desigualdad triangular: si la distancia entre centroides es al menos el doble de la distancia conocida al centroide asignado, el otro centroide no puede estar más cerca y no hace falta medirlo.">
+        <line x1="70" y1="185" x2="270" y2="185" stroke="#1A1A1A" stroke-width="1.5" />
+        <line x1="270" y1="185" x2="330" y2="45" stroke="#1A1A1A" stroke-width="1.5" />
+        <line x1="70" y1="185" x2="330" y2="45" stroke="#6B6B6B" stroke-width="1.5" stroke-dasharray="6 5" />
+        <circle cx="70" cy="185" r="5" fill="#1A1A1A" />
+        <circle cx="270" cy="185" r="8" fill="#FFFFFF" stroke="#2D5BFF" stroke-width="2.5" />
+        <circle cx="330" cy="45" r="8" fill="#FFFFFF" stroke="#FF7A3D" stroke-width="2.5" />
+        <text x="58" y="210" font-size="15" fill="#1A1A1A">x</text>
+        <text x="248" y="212" font-size="15" fill="#2D5BFF">c asignado</text>
+        <text x="342" y="42" font-size="15" fill="#FF7A3D">c otro</text>
+        <text x="155" y="178" font-size="14" fill="#1A1A1A">u(x)</text>
+        <text x="308" y="128" font-size="14" fill="#1A1A1A">d(c, c′)</text>
+        <text x="150" y="100" font-size="14" fill="#6B6B6B">¿hace falta medirla?</text>
+      </svg>
+      <figcaption class="caption">
+        La desigualdad triangular dice que la línea discontinua no puede medir
+        menos que <em>d(c, c′) − u(x)</em>. Si <em>d(c, c′) ≥ 2 · u(x)</em>, el
+        otro centroide queda descartado sin medir nada: ese es el ahorro.
+      </figcaption>
+    </figure>
+  </div>
+</section>
+
+<style>
+  .race {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 16px;
+    padding: 16px;
+  }
+
+  .race figure {
+    margin: 0;
+  }
+
+  .race canvas {
+    border: 1px solid var(--line);
+  }
+
+  .race figcaption {
+    margin-block-end: 8px;
+  }
+
+  @media (max-width: 640px) {
+    .race {
+      grid-template-columns: 1fr;
+    }
+  }
+
+  .triangulo {
+    margin: 48px 0 0;
+  }
+
+  .triangulo svg {
+    width: 100%;
+    max-width: 420px;
+    height: auto;
+    display: block;
+    margin-inline: auto;
+  }
+</style>
+
+<script>
+  import { Lloyd } from '../../lib/algorithms/lloyd.ts';
+  import { Elkan } from '../../lib/algorithms/elkan.ts';
+  import { blobs } from '../../lib/data/datasets.ts';
+  import { CanvasRenderer } from '../../lib/sim/renderer.ts';
+
+  const root = document.getElementById('sala-elkan')!;
+  const out = (n: string) => root.querySelector<HTMLElement>(`[data-out="${n}"]`)!;
+  const btn = (a: string) => root.querySelector<HTMLButtonElement>(`[data-action="${a}"]`)!;
+
+  const seed = 4;
+  const k = 4;
+  const points = blobs(41, 320);
+  const lloyd = new Lloyd();
+  const elkan = new Elkan();
+  const rLloyd = new CanvasRenderer(root.querySelector('[data-canvas="lloyd"]')!);
+  const rElkan = new CanvasRenderer(root.querySelector('[data-canvas="elkan"]')!);
+  let timer: ReturnType<typeof setTimeout> | null = null;
+  let playing = false;
+
+  const fmt = new Intl.NumberFormat('es-ES');
+
+  function refresh() {
+    rLloyd.setState({ points, labels: lloyd.labels, centroids: lloyd.centroids });
+    rElkan.setState({ points, labels: elkan.labels, centroids: elkan.centroids });
+    const a = lloyd.metrics.distanceComputations;
+    const b = elkan.metrics.distanceComputations;
+    out('lloyd-comps').textContent = fmt.format(a);
+    out('elkan-comps').textContent = fmt.format(b);
+    out('saving').textContent = a > 0 ? `${Math.round((1 - b / a) * 100)} %` : '·';
+    out('same').textContent =
+      lloyd.metrics.iteration === 0
+        ? '·'
+        : lloyd.labels.every((l, i) => l === elkan.labels[i])
+          ? 'sí'
+          : 'no';
+    btn('play').textContent = playing ? 'pausar' : 'reproducir';
+    const done = lloyd.converged && elkan.converged;
+    btn('play').disabled = done;
+    btn('step').disabled = done;
+  }
+
+  /** Un paso de cada uno, a la vez y en igualdad de condiciones. */
+  function step() {
+    if (!lloyd.converged) lloyd.step();
+    if (!elkan.converged) elkan.step();
+    refresh();
+  }
+
+  function stop() {
+    playing = false;
+    if (timer) clearTimeout(timer);
+    timer = null;
+    refresh();
+  }
+
+  function play() {
+    if (playing || (lloyd.converged && elkan.converged)) return;
+    playing = true;
+    const loop = () => {
+      if (!playing) return;
+      step();
+      if (lloyd.converged && elkan.converged) stop();
+      else timer = setTimeout(loop, 700);
+    };
+    loop();
+  }
+
+  function reset() {
+    stop();
+    lloyd.init(points, k, seed);
+    elkan.init(points, k, seed);
+    refresh();
+  }
+
+  btn('step').addEventListener('click', () => {
+    stop();
+    step();
+  });
+  btn('play').addEventListener('click', () => (playing ? stop() : play()));
+  btn('reset').addEventListener('click', reset);
+  root.addEventListener('contentvisibilityautostatechange', (ev) => {
+    if ((ev as ContentVisibilityAutoStateChangeEvent).skipped) stop();
+  });
+
+  reset();
+</script>

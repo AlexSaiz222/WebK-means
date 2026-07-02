@@ -12,7 +12,13 @@ compruebas con tus propias manos.
 
 ## Estado
 
-En construcción. Ver el plan en [`docs/ROADMAP.md`](docs/ROADMAP.md).
+Recorrido completo funcionando en local (hitos M0–M4: apertura, sandbox base,
+las cinco salas, arena comparativa y guía de decisión). Pendiente el despliegue
+público (M5). Ver el plan en [`docs/ROADMAP.md`](docs/ROADMAP.md).
+
+Los cinco algoritmos pasan las comprobaciones de fidelidad de
+[`docs/ALGORITMOS.md`](docs/ALGORITMOS.md) con `npm test` (Node ≥ 22.6, usa
+type stripping nativo).
 
 ## Estructura del proyecto
 

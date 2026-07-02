@@ -11,7 +11,7 @@ Notación:
 - `k` = número de clústeres. `c_j` = centroide del clúster `j`. `n_j` = nº de
   puntos asignados al clúster `j`.
 - Distancia euclídea salvo que se diga otra cosa.
-- **Función objetivo (SSE)** común a las variantes duras: suma de distancias al
+- **Inercia** común a las variantes duras: suma de distancias al
   cuadrado de cada punto a su centroide asignado. Es la métrica comparable entre
   todas (en Fuzzy se calcula con la etiqueta dura = argmax de pertenencia).
 

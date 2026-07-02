@@ -5,7 +5,7 @@ de empezar el siguiente. No adelantes trabajo de hitos posteriores.
 
 ---
 
-## M0 — Andamiaje
+## M0 — Andamiaje · HECHO (2026-07-02)
 
 - Inicializar Astro + TypeScript (plantilla mínima, salida estática, modo
   `strict` de TypeScript).
@@ -20,7 +20,7 @@ de empezar el siguiente. No adelantes trabajo de hitos posteriores.
 **Hecho cuando:** `npm run dev` levanta una página vacía con los estilos base y
 el proyecto compila sin errores de tipos.
 
-## M1 — Motor + base común (sección 1)
+## M1 — Motor + base común (sección 1) · HECHO (2026-07-02)
 
 - `src/lib/algorithms/kmeans-base.ts`: init k-means++, cálculo de distancias,
   cálculo de SSE.
@@ -33,7 +33,12 @@ el proyecto compila sin errores de tipos.
 
 **Hecho cuando:** se puede jugar con K-Means base de forma fluida y correcta.
 
-## M2 — Las cinco variantes (sección 2)
+## M2 — Las cinco variantes (sección 2) · HECHO (2026-07-02)
+
+> Las cinco salas funcionan y pasan las comprobaciones de fidelidad
+> (`npm test`): Elkan == Lloyd con ~79 % menos distancias, MacQueen sensible al
+> orden, SSE monótona en las variantes duras, Fuzzy gradual con `m`. Pendiente
+> de revisión visual fina y repaso en móvil (se hará en M4).
 
 Implementa cada una en `src/lib/algorithms/` **según `docs/ALGORITMOS.md`** y
 monta su sala como componente en `src/components/sections/`. Sugerido en este
@@ -51,7 +56,11 @@ MacQueen).
 **Hecho cuando:** las cinco salas funcionan y cada una demuestra su diferencia
 característica de forma fiel.
 
-## M3 — Arena comparativa (sección 3)
+## M3 — Arena comparativa (sección 3) · HECHO (2026-07-02)
+
+> Verificada en navegador: misma semilla reproduce el resultado exacto; Elkan
+> iguala el SSE de Lloyd con menos de la mitad de distancias; MacQueen converge
+> en menos iteraciones; en las lunas todas fallan por igual (SSE ~7.45).
 
 - Ejecutar las cinco variantes en paralelo sobre el mismo dataset y semilla.
 - Panel de métricas vivo (iteraciones, cálculos de distancia, calidad).
@@ -61,7 +70,12 @@ característica de forma fiel.
 **Hecho cuando:** se aprecia de un vistazo dónde cada algoritmo brilla o falla al
 cambiar la forma de los datos.
 
-## M4 — Guía de decisión + apertura + pulido (secciones 0, 4, 5)
+## M4 — Guía de decisión + apertura + pulido (secciones 0, 4, 5) · HECHO (2026-07-02)
+
+> Apertura con animación en bucle (se pausa fuera de pantalla y con
+> `prefers-reduced-motion`), guía de decisión con las cinco situaciones
+> enlazando a su sala, cierre, y repaso móvil (390 px sin desbordamiento).
+> El tema oscuro queda como extra opcional.
 
 - Sección de apertura con la animación en bucle y el titular.
 - Guía de decisión interactiva ("si tus datos son X → usa Y, porque Z").
