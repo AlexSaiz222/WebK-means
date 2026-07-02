@@ -16,11 +16,25 @@
       <strong>desigualdad triangular</strong> para descartar centroides
       <em>sin llegar a medirlos</em>. Misma respuesta con muchos menos
       cálculos, y esa diferencia se dispara en datasets grandes.
+      Puedes añadir puntos haciendo clic en cualquiera de los lienzos, arrastrarlos o mover sus centroides para ver el ahorro de distancias en tiempo real.
     </p>
   </div>
 
   <div class="lab reveal">
     <div class="panel">
+      <div class="controls toolbar">
+        <div class="seg" role="group" aria-label="forma de los datos">
+          <button class="seg-btn" data-shape="redondos" aria-pressed="true">redondos</button>
+          <button class="seg-btn" data-shape="alargados" aria-pressed="false">alargados</button>
+          <button class="seg-btn" data-shape="desiguales" aria-pressed="false">desiguales</button>
+          <button class="seg-btn" data-shape="lunas" aria-pressed="false">lunas</button>
+        </div>
+        <button class="btn" data-action="regen">otra muestra</button>
+        <label class="field">
+          k = <output data-out="k">4</output>
+          <input type="range" min="2" max="6" step="1" value="4" data-in="k" aria-label="número de grupos k" />
+        </label>
+      </div>
       <div class="race">
         <figure>
           <figcaption class="caption">Lloyd</figcaption>
@@ -31,10 +45,26 @@
           <canvas data-canvas="elkan" aria-label="Elkan sobre los mismos datos y semilla"></canvas>
         </figure>
       </div>
-      <div class="controls">
+      <p class="hint" data-hint>arrastra puntos o centroides en cualquiera de los lienzos · clic para añadir</p>
+      <div class="controls timeline">
         <button class="btn btn-primary" data-action="play">reproducir</button>
-        <button class="btn" data-action="step">paso a paso</button>
+        <button class="btn arrow" data-action="back" aria-label="fase anterior">←</button>
+        <input
+          type="range"
+          min="0"
+          max="0"
+          step="1"
+          value="0"
+          data-in="pos"
+          aria-label="posición en la ejecución"
+        />
+        <button class="btn arrow" data-action="step" aria-label="fase siguiente">→</button>
+        <output class="caption" data-out="pos-label">paso 0 de 0</output>
         <button class="btn" data-action="reset">reiniciar</button>
+      </div>
+      <div class="narration-box">
+        <span class="phase-chip" data-out="phase">inicio</span>
+        <p class="narration" data-out="narration">·</p>
       </div>
       <dl class="metrics">
         <div class="metric">
@@ -52,6 +82,10 @@
         <div class="metric">
           <dt>mismas etiquetas</dt>
           <dd data-out="same">·</dd>
+        </div>
+        <div class="metric">
+          <dt>estado</dt>
+          <dd data-out="status">listo</dd>
         </div>
       </dl>
     </div>
@@ -124,87 +158,378 @@
 <script>
   import { Lloyd } from '../../lib/algorithms/lloyd.ts';
   import { Elkan } from '../../lib/algorithms/elkan.ts';
-  import { blobs } from '../../lib/data/datasets.ts';
+
+  import type { Point } from '../../lib/algorithms/types.ts';
+  import { blobs, anisotropic, unevenDensities, moons } from '../../lib/data/datasets.ts';
   import { CanvasRenderer } from '../../lib/sim/renderer.ts';
 
   const root = document.getElementById('sala-elkan')!;
   const out = (n: string) => root.querySelector<HTMLElement>(`[data-out="${n}"]`)!;
   const btn = (a: string) => root.querySelector<HTMLButtonElement>(`[data-action="${a}"]`)!;
+  const hint = root.querySelector<HTMLElement>('[data-hint]')!;
+  const posInput = root.querySelector<HTMLInputElement>('[data-in="pos"]')!;
+  const kInput = root.querySelector<HTMLInputElement>('[data-in="k"]')!;
+
+  const SHAPES: Record<string, (seed: number, n: number) => Point[]> = {
+    redondos: blobs,
+    alargados: anisotropic,
+    desiguales: unevenDensities,
+    lunas: moons,
+  };
 
   const seed = 4;
-  const k = 4;
-  const points = blobs(41, 320);
+  let shape = 'redondos';
+  let dataSeed = 41;
+  let k = 4;
+  let points = SHAPES[shape]!(dataSeed, 200);
+
   const lloyd = new Lloyd();
   const elkan = new Elkan();
-  const rLloyd = new CanvasRenderer(root.querySelector('[data-canvas="lloyd"]')!);
-  const rElkan = new CanvasRenderer(root.querySelector('[data-canvas="elkan"]')!);
-  let timer: ReturnType<typeof setTimeout> | null = null;
-  let playing = false;
+  const cLloyd = root.querySelector<HTMLCanvasElement>('[data-canvas="lloyd"]')!;
+  const cElkan = root.querySelector<HTMLCanvasElement>('[data-canvas="elkan"]')!;
+  const rLloyd = new CanvasRenderer(cLloyd);
+  const rElkan = new CanvasRenderer(cElkan);
+  const accent =
+    getComputedStyle(cLloyd).getPropertyValue('--accent').trim() || '#2D5BFF';
 
   const fmt = new Intl.NumberFormat('es-ES');
 
-  function refresh() {
-    rLloyd.setState({ points, labels: lloyd.labels, centroids: lloyd.centroids });
-    rElkan.setState({ points, labels: elkan.labels, centroids: elkan.centroids });
-    const a = lloyd.metrics.distanceComputations;
-    const b = elkan.metrics.distanceComputations;
-    out('lloyd-comps').textContent = fmt.format(a);
-    out('elkan-comps').textContent = fmt.format(b);
-    out('saving').textContent = a > 0 ? `${Math.round((1 - b / a) * 100)} %` : '·';
-    out('same').textContent =
-      lloyd.metrics.iteration === 0
-        ? '·'
-        : lloyd.labels.every((l, i) => l === elkan.labels[i])
-          ? 'sí'
-          : 'no';
+  // ---- historial ----
+  interface HistoryFrame {
+    iteration: number;
+    lloydLabels: number[];
+    lloydCentroids: Point[];
+    lloydDists: number;
+    elkanLabels: number[];
+    elkanCentroids: Point[];
+    elkanDists: number;
+    inertiaVal: number;
+    converged: boolean;
+  }
+
+  let history: HistoryFrame[] = [];
+  let pos = 0;
+  const current = () => history[pos]!;
+  const last = () => history[history.length - 1]!;
+
+  function snapshot(): HistoryFrame {
+    return {
+      iteration: lloyd.metrics.iteration,
+      lloydLabels: [...lloyd.labels],
+      lloydCentroids: lloyd.centroids.map(c => ({ ...c })),
+      lloydDists: lloyd.metrics.distanceComputations,
+      elkanLabels: [...elkan.labels],
+      elkanCentroids: elkan.centroids.map(c => ({ ...c })),
+      elkanDists: elkan.metrics.distanceComputations,
+      inertiaVal: lloyd.metrics.inertia,
+      converged: lloyd.converged && elkan.converged,
+    };
+  }
+
+  function computeRun() {
+    let guard = 0;
+    while (!(lloyd.converged && elkan.converged) && guard++ < 80) {
+      if (!lloyd.converged) lloyd.step();
+      if (!elkan.converged) elkan.step();
+      history.push(snapshot());
+    }
+  }
+
+  function narration(): string {
+    const s = current();
+    if (s.iteration === 0) {
+      return (
+        'Ambos algoritmos arrancan con la misma semilla (k-means++). Pulsa <strong>reproducir</strong> o <strong>→</strong> ' +
+        'para ver cómo avanzan en paralelo: mismas etiquetas, distinto trabajo.'
+      );
+    }
+    const saving = s.lloydDists > 0
+      ? Math.round((1 - s.elkanDists / s.lloydDists) * 100)
+      : 0;
+    const conv = s.converged
+      ? ' <strong>Convergido.</strong>'
+      : '';
+    return (
+      `Iteración ${s.iteration}. Lloyd calculó <strong>${fmt.format(s.lloydDists)}</strong> distancias, ` +
+      `Elkan solo <strong>${fmt.format(s.elkanDists)}</strong> (ahorro ${saving} %).${conv}`
+    );
+  }
+
+  function display(animate = true) {
+    const s = current();
+    rLloyd.setState({ points, labels: s.lloydLabels, centroids: s.lloydCentroids }, animate);
+    rElkan.setState({ points, labels: s.elkanLabels, centroids: s.elkanCentroids }, animate);
+
+    const total = history.length - 1;
+    posInput.max = String(total);
+    posInput.value = String(pos);
+    posInput.style.setProperty('--p', `${total > 0 ? (pos / total) * 100 : 0}%`);
+    out('pos-label').textContent = `paso ${pos} de ${total}`;
+    out('phase').textContent = s.iteration > 0 ? `iteración ${s.iteration}` : 'inicio';
+    out('narration').innerHTML = narration();
+
+    out('lloyd-comps').textContent = fmt.format(s.lloydDists);
+    out('elkan-comps').textContent = fmt.format(s.elkanDists);
+    out('saving').textContent = s.lloydDists > 0
+      ? `${Math.round((1 - s.elkanDists / s.lloydDists) * 100)} %`
+      : '·';
+    out('same').textContent = s.iteration === 0
+      ? '·'
+      : s.lloydLabels.every((l, i) => l === s.elkanLabels[i])
+        ? 'sí'
+        : 'no';
+    out('status').textContent =
+      s.converged && pos === history.length - 1
+        ? 'convergido'
+        : playing
+          ? 'en marcha'
+          : pos === 0 && s.iteration === 0
+            ? 'listo'
+            : pos < history.length - 1
+              ? 'repasando'
+              : 'pausado';
+
+    const atEnd = pos === history.length - 1 && last().converged;
     btn('play').textContent = playing ? 'pausar' : 'reproducir';
-    const done = lloyd.converged && elkan.converged;
-    btn('play').disabled = done;
-    btn('step').disabled = done;
+    btn('play').disabled = atEnd;
+    btn('step').disabled = atEnd;
+    btn('back').disabled = pos === 0;
   }
 
-  /** Un paso de cada uno, a la vez y en igualdad de condiciones. */
-  function step() {
-    if (!lloyd.converged) lloyd.step();
-    if (!elkan.converged) elkan.step();
-    refresh();
+  function forward(animate = true): boolean {
+    if (pos >= history.length - 1) return false;
+    pos++;
+    display(animate);
+    return true;
   }
 
-  function stop() {
+  function back() {
+    if (pos === 0) return;
+    pos--;
+    display();
+  }
+
+  // ---- reproducir ----
+  let playing = false;
+  let timer: ReturnType<typeof setTimeout> | null = null;
+
+  function stopPlay() {
     playing = false;
     if (timer) clearTimeout(timer);
     timer = null;
-    refresh();
   }
 
   function play() {
-    if (playing || (lloyd.converged && elkan.converged)) return;
+    if (playing) return;
     playing = true;
     const loop = () => {
       if (!playing) return;
-      step();
-      if (lloyd.converged && elkan.converged) stop();
-      else timer = setTimeout(loop, 700);
+      if (forward()) timer = setTimeout(loop, 700);
+      else stopPlay();
+      display();
     };
     loop();
   }
 
-  function reset() {
-    stop();
-    lloyd.init(points, k, seed);
-    elkan.init(points, k, seed);
-    refresh();
+  function reinit() {
+    stopPlay();
+    lloyd.init(points, k, seed + dataSeed);
+    elkan.init(points, k, seed + dataSeed);
+    history = [snapshot()];
+    pos = 0;
+    computeRun();
+    display(false);
   }
 
-  btn('step').addEventListener('click', () => {
-    stop();
-    step();
+  // ---- controles ----
+  btn('play').addEventListener('click', () => {
+    if (playing) { stopPlay(); display(); }
+    else play();
   });
-  btn('play').addEventListener('click', () => (playing ? stop() : play()));
-  btn('reset').addEventListener('click', reset);
-  root.addEventListener('contentvisibilityautostatechange', (ev) => {
-    if ((ev as ContentVisibilityAutoStateChangeEvent).skipped) stop();
+  btn('step').addEventListener('click', () => { stopPlay(); forward(); });
+  btn('back').addEventListener('click', () => { stopPlay(); back(); });
+  btn('reset').addEventListener('click', reinit);
+  btn('regen').addEventListener('click', () => {
+    dataSeed++;
+    points = SHAPES[shape]!(dataSeed, 200);
+    reinit();
   });
 
-  reset();
+  posInput.addEventListener('input', () => {
+    stopPlay();
+    pos = Number(posInput.value);
+    display(false);
+  });
+
+  kInput.addEventListener('input', () => {
+    k = Number(kInput.value);
+    out('k').textContent = kInput.value;
+    reinit();
+  });
+
+  for (const b of root.querySelectorAll<HTMLButtonElement>('.seg-btn')) {
+    b.addEventListener('click', () => {
+      shape = b.dataset.shape!;
+      for (const other of root.querySelectorAll('.seg-btn')) {
+        other.setAttribute('aria-pressed', String(other === b));
+      }
+      points = SHAPES[shape]!(dataSeed, 200);
+      reinit();
+    });
+  }
+
+  // ---- teclado ----
+  let inView = false;
+  new IntersectionObserver(
+    (entries) => { for (const e of entries) inView = e.isIntersecting; },
+    { threshold: 0.25 },
+  ).observe(root);
+
+  document.addEventListener('keydown', (ev) => {
+    if (!inView || (ev.key !== 'ArrowLeft' && ev.key !== 'ArrowRight')) return;
+    const t = ev.target as HTMLElement;
+    if (t instanceof HTMLInputElement && t !== posInput) return;
+    ev.preventDefault();
+    stopPlay();
+    if (ev.key === 'ArrowRight') forward();
+    else back();
+  });
+
+  // ---- interacción con los lienzos ----
+  const clamp01 = (v: number) => Math.min(0.98, Math.max(0.02, v));
+  let dragCentroid = -1;
+  let dragPoint = -1;
+  let hoverCentroid = -1;
+
+  const hitCentroid = (p: Point, centroids: Point[], renderer: CanvasRenderer) => {
+    const tol = renderer.pxToData(14);
+    let best = -1;
+    let bestD = tol * tol;
+    centroids.forEach((c, j) => {
+      const d = (c.x - p.x) ** 2 + (c.y - p.y) ** 2;
+      if (d < bestD) { bestD = d; best = j; }
+    });
+    return best;
+  };
+
+  const hitPoint = (p: Point, renderer: CanvasRenderer) => {
+    const tol = renderer.pxToData(11);
+    let best = -1;
+    let bestD = tol * tol;
+    points.forEach((q, i) => {
+      const d = (q.x - p.x) ** 2 + (q.y - p.y) ** 2;
+      if (d < bestD) { bestD = d; best = i; }
+    });
+    return best;
+  };
+
+  const overlayFn = (ctx: CanvasRenderingContext2D, map: { x: (v: number) => number; y: (v: number) => number }) => {
+    if (hoverCentroid >= 0) {
+      const c = current().lloydCentroids[hoverCentroid];
+      if (c) {
+        ctx.beginPath();
+        ctx.arc(map.x(c.x), map.y(c.y), 13, 0, Math.PI * 2);
+        ctx.lineWidth = 2;
+        ctx.strokeStyle = accent;
+        ctx.stroke();
+      }
+    }
+  };
+
+  rLloyd.setOverlay(overlayFn);
+  rElkan.setOverlay(overlayFn);
+
+  const setupEvents = (canvas: HTMLCanvasElement, renderer: CanvasRenderer) => {
+    canvas.addEventListener('pointerdown', (ev) => {
+      hint.classList.add('is-hidden');
+      stopPlay();
+      const p = renderer.eventToData(ev);
+      const cents = current().lloydCentroids;
+      const cIdx = hitCentroid(p, cents, renderer);
+      if (cIdx >= 0) {
+        // slice history at current pos for branching
+        history = history.slice(0, pos + 1);
+        dragCentroid = cIdx;
+        canvas.style.cursor = 'grabbing';
+        canvas.setPointerCapture(ev.pointerId);
+        return;
+      }
+      const pIdx = hitPoint(p, renderer);
+      if (pIdx >= 0) {
+        dragPoint = pIdx;
+        canvas.style.cursor = 'grabbing';
+        canvas.setPointerCapture(ev.pointerId);
+      } else {
+        points.push({ x: clamp01(p.x), y: clamp01(p.y) });
+        reinit();
+      }
+    });
+
+    canvas.addEventListener('pointermove', (ev) => {
+      const p = renderer.eventToData(ev);
+      if (dragCentroid >= 0) {
+        const s = current();
+        s.lloydCentroids[dragCentroid] = { x: clamp01(p.x), y: clamp01(p.y) };
+        s.elkanCentroids[dragCentroid] = { x: clamp01(p.x), y: clamp01(p.y) };
+        display(false);
+        return;
+      }
+      if (dragPoint >= 0) {
+        points[dragPoint] = { x: clamp01(p.x), y: clamp01(p.y) };
+        display(false);
+        return;
+      }
+
+      const cents = current().lloydCentroids;
+      const cIdx = hitCentroid(p, cents, renderer);
+      if (cIdx !== hoverCentroid) {
+        hoverCentroid = cIdx;
+        display(false);
+      }
+      canvas.style.cursor = cIdx >= 0 || hitPoint(p, renderer) >= 0 ? 'grab' : 'crosshair';
+    });
+
+    canvas.addEventListener('pointerup', () => {
+      if (dragCentroid >= 0) {
+        dragCentroid = -1;
+        canvas.style.cursor = 'grab';
+        // re-init both algos with the centroids at their dragged positions
+        // (we need to fully reinit since Elkan has internal bounds state)
+        reinit();
+        return;
+      }
+      if (dragPoint >= 0) {
+        dragPoint = -1;
+        canvas.style.cursor = 'grab';
+        reinit();
+      }
+    });
+
+    canvas.addEventListener('pointerleave', () => {
+      if (hoverCentroid >= 0) {
+        hoverCentroid = -1;
+        display(false);
+      }
+    });
+  };
+
+  setupEvents(cLloyd, rLloyd);
+  setupEvents(cElkan, rElkan);
+
+  root.addEventListener('contentvisibilityautostatechange', (ev) => {
+    if ((ev as ContentVisibilityAutoStateChangeEvent).skipped) {
+      stopPlay();
+      display();
+    }
+  });
+
+  // gancho para verificación
+  (window as unknown as Record<string, unknown>).__labElkan = {
+    centroids: () => current().elkanCentroids.map(c => ({ ...c })),
+    pos: () => pos,
+    length: () => history.length,
+    points: () => points.map(p => ({ ...p })),
+  };
+
+  reinit();
 </script>

@@ -18,18 +18,49 @@
     <p>
       Avanza <em>tiempo a tiempo</em> y fíjate: primero cambian los colores
       (asignación masiva), luego se mueven los centroides (actualización).
+      Puedes añadir puntos con un clic, arrastrarlos, o mover un centroide
+      para ver cómo cambia el ciclo desde ahí.
     </p>
   </div>
 
   <div class="lab reveal">
     <div class="panel">
+      <div class="controls toolbar">
+        <div class="seg" role="group" aria-label="forma de los datos">
+          <button class="seg-btn" data-shape="redondos" aria-pressed="true">redondos</button>
+          <button class="seg-btn" data-shape="alargados" aria-pressed="false">alargados</button>
+          <button class="seg-btn" data-shape="desiguales" aria-pressed="false">desiguales</button>
+          <button class="seg-btn" data-shape="lunas" aria-pressed="false">lunas</button>
+        </div>
+        <button class="btn" data-action="regen">otra muestra</button>
+        <label class="field">
+          k = <output data-out="k">3</output>
+          <input type="range" min="2" max="6" step="1" value="3" data-in="k" aria-label="número de grupos k" />
+        </label>
+      </div>
       <div class="canvas-wrap">
         <canvas aria-label="Visualización del ciclo por lotes de Lloyd"></canvas>
+        <p class="hint" data-hint>arrastra puntos o centroides · clic para añadir un punto</p>
       </div>
-      <div class="controls">
-        <button class="btn btn-primary" data-action="beat">1 · asignar puntos</button>
-        <button class="btn" data-action="play">reproducir</button>
+      <div class="controls timeline">
+        <button class="btn btn-primary" data-action="play">reproducir</button>
+        <button class="btn arrow" data-action="back" aria-label="fase anterior">←</button>
+        <input
+          type="range"
+          min="0"
+          max="0"
+          step="1"
+          value="0"
+          data-in="pos"
+          aria-label="posición en la ejecución (también responde a las flechas del teclado)"
+        />
+        <button class="btn arrow" data-action="step" aria-label="fase siguiente">→</button>
+        <output class="caption" data-out="pos-label">paso 0 de 0</output>
         <button class="btn" data-action="reset">reiniciar</button>
+      </div>
+      <div class="narration-box">
+        <span class="phase-chip" data-out="phase">inicio</span>
+        <p class="narration" data-out="narration">·</p>
       </div>
       <dl class="metrics">
         <div class="metric">
@@ -39,7 +70,6 @@
         <div class="metric">
           <dt>Inercia</dt>
           <dd data-out="inertia">·</dd>
-        </div>
         <div class="metric">
           <dt>estado</dt>
           <dd data-out="status">listo</dd>
@@ -51,99 +81,447 @@
 
 <script>
   import { Lloyd } from '../../lib/algorithms/lloyd.ts';
+  import { inertia, mulberry32 } from '../../lib/algorithms/kmeans-base.ts';
   import type { Point } from '../../lib/algorithms/types.ts';
-  import { blobs } from '../../lib/data/datasets.ts';
+  import { blobs, anisotropic, unevenDensities, moons } from '../../lib/data/datasets.ts';
   import { CanvasRenderer } from '../../lib/sim/renderer.ts';
 
   const root = document.getElementById('sala-lloyd')!;
   const canvas = root.querySelector('canvas')!;
   const out = (n: string) => root.querySelector<HTMLElement>(`[data-out="${n}"]`)!;
   const btn = (a: string) => root.querySelector<HTMLButtonElement>(`[data-action="${a}"]`)!;
+  const hint = root.querySelector<HTMLElement>('[data-hint]')!;
+  const posInput = root.querySelector<HTMLInputElement>('[data-in="pos"]')!;
+  const kInput = root.querySelector<HTMLInputElement>('[data-in="k"]')!;
+
+  const SHAPES: Record<string, (seed: number, n: number) => Point[]> = {
+    redondos: blobs,
+    alargados: anisotropic,
+    desiguales: unevenDensities,
+    lunas: moons,
+  };
 
   const seed = 5;
-  const points: Point[] = blobs(33, 160);
+  let shape = 'redondos';
+  let dataSeed = 10;
+  let k = 3;
+  let points: Point[] = SHAPES[shape]!(dataSeed, 150);
+
   const lloyd = new Lloyd();
   const renderer = new CanvasRenderer(canvas);
+  const accent =
+    getComputedStyle(canvas).getPropertyValue('--accent').trim() || '#2D5BFF';
 
-  // 'assign' = el siguiente tiempo reasigna; 'update' = el siguiente mueve centroides
-  let phase: 'assign' | 'update' = 'assign';
-  let pending: Point[] = []; // centroides nuevos, aún sin mostrar
-  let timer: ReturnType<typeof setTimeout> | null = null;
-  let playing = false;
+  // ---- historial ----
+  type Phase = 'inicio' | 'asignacion' | 'actualizacion';
+  const PHASE_LABEL: Record<Phase, string> = {
+    inicio: 'inicio',
+    asignacion: 'asignación',
+    actualizacion: 'actualización',
+  };
 
-  // terminado del todo: convergido y con el último salto de centroides ya mostrado
-  const finished = () => lloyd.converged && phase === 'assign';
-
-  function refresh() {
-    out('iteration').textContent = String(lloyd.metrics.iteration);
-    out('inertia').textContent = Number.isNaN(lloyd.metrics.inertia)
-      ? '·'
-      : lloyd.metrics.inertia.toFixed(3);
-    out('status').textContent = finished()
-      ? 'convergido'
-      : playing
-        ? 'en marcha'
-        : lloyd.metrics.iteration === 0 && phase === 'assign'
-          ? 'listo'
-          : 'pausado';
-    btn('beat').textContent = phase === 'assign' ? '1 · asignar puntos' : '2 · actualizar centroides';
-    btn('play').textContent = playing ? 'pausar' : 'reproducir';
-    btn('beat').disabled = finished();
-    btn('play').disabled = finished();
+  interface HistoryFrame {
+    phase: Phase;
+    iteration: number;
+    inertia: number;
+    converged: boolean;
+    labels: number[];
+    centroids: Point[];
+    changed: number[];
+    moved: number;
   }
 
-  /** Un tiempo del ciclo: o reasigna en bloque, o mueve los centroides. */
-  function beat() {
-    if (finished()) return;
-    if (phase === 'assign') {
-      const before = lloyd.centroids.map((c) => ({ ...c }));
-      lloyd.step(); // asigna y recalcula, pero mostramos solo la asignación
-      pending = lloyd.centroids.map((c) => ({ ...c }));
-      renderer.setState({ points, labels: lloyd.labels, centroids: before }, false);
-      phase = 'update';
-    } else {
-      renderer.setState({ points, labels: lloyd.labels, centroids: pending });
-      phase = 'assign';
+  let history: HistoryFrame[] = [];
+  let pos = 0;
+
+  const current = () => history[pos]!;
+  const last = () => history[history.length - 1]!;
+
+  function fromLloyd(phase: Phase, changed: number[], moved: number): HistoryFrame {
+    return {
+      phase,
+      iteration: lloyd.metrics.iteration,
+      inertia: lloyd.metrics.inertia,
+      converged: lloyd.converged,
+      labels: [...lloyd.labels],
+      centroids: lloyd.centroids.map((c) => ({ ...c })),
+      changed,
+      moved,
+    };
+  }
+
+  function restore(s: HistoryFrame) {
+    lloyd.metrics.iteration = s.iteration;
+    lloyd.metrics.inertia = s.inertia;
+    lloyd.converged = s.converged;
+    lloyd.labels = [...s.labels];
+    lloyd.centroids = s.centroids.map((c) => ({ ...c }));
+  }
+
+  function computeIteration() {
+    const prevLabels = [...lloyd.labels];
+    const prevCentroids = lloyd.centroids.map((c) => ({ ...c }));
+    lloyd.step();
+    const currLabels = [...lloyd.labels];
+    const currCentroids = lloyd.centroids.map((c) => ({ ...c }));
+
+    const changed = [];
+    for (let i = 0; i < points.length; i++) {
+      if (prevLabels[i] !== currLabels[i]) changed.push(i);
     }
-    refresh();
+    history.push({
+      phase: 'asignacion',
+      iteration: lloyd.metrics.iteration,
+      inertia: lloyd.metrics.inertia,
+      converged: false,
+      labels: currLabels,
+      centroids: prevCentroids,
+      changed,
+      moved: 0,
+    });
+
+    let maxMove = 0;
+    for (let j = 0; j < lloyd.centroids.length; j++) {
+      const d = Math.hypot(currCentroids[j].x - prevCentroids[j].x, currCentroids[j].y - prevCentroids[j].y);
+      maxMove = Math.max(maxMove, d);
+    }
+    history.push({
+      phase: 'actualizacion',
+      iteration: lloyd.metrics.iteration,
+      inertia: lloyd.metrics.inertia,
+      converged: lloyd.converged,
+      labels: currLabels,
+      centroids: currCentroids,
+      changed: [],
+      moved: maxMove,
+    });
   }
 
-  function stop() {
+  function narration(): string {
+    const s = current();
+    if (s.phase === 'inicio') {
+      return (
+        'Semillas de clúster inicializadas. Pulsa <strong>reproducir</strong> o avanza con <strong>→</strong> ' +
+        'para ver el primer paso del ciclo por lotes.'
+      );
+    }
+    if (s.phase === 'asignacion') {
+      if (s.iteration === 1) {
+        return 'Cada punto se apunta al centroide más cercano y recibe su primer color. Los centroides todavía no se han movido.';
+      }
+      const n = s.changed.length;
+      return (
+        'Cada punto vuelve a elegir el centroide más cercano. ' +
+        (n === 0
+          ? 'Ningún punto cambia de grupo: la partición ya es estable.'
+          : n === 1
+            ? '1 punto cambia de grupo (marcado con un aro).'
+            : `${n} puntos cambian de grupo (marcados con un aro).`)
+      );
+    }
+    const conv = s.converged
+      ? ' El movimiento queda por debajo de la tolerancia: <strong>convergido</strong>.'
+      : '';
+    return (
+      'Cada centroide salta a la media de los puntos que lo eligieron ' +
+      `(desplazamiento máximo ${s.moved.toFixed(3)}).` +
+      conv
+    );
+  }
+
+  function display(animate = true) {
+    const s = current();
+    renderer.setState({ points, labels: s.labels, centroids: s.centroids }, animate);
+    const total = history.length - 1;
+    posInput.max = String(total);
+    posInput.value = String(pos);
+    posInput.style.setProperty('--p', `${total > 0 ? (pos / total) * 100 : 0}%`);
+    out('pos-label').textContent = `paso ${pos} de ${total}`;
+    out('phase').textContent =
+      s.phase === 'actualizacion' || s.phase === 'asignacion'
+        ? `iteración ${s.iteration} · ${PHASE_LABEL[s.phase]}`
+        : PHASE_LABEL[s.phase];
+    out('narration').innerHTML = narration();
+    out('iteration').textContent = String(s.iteration);
+    out('inertia').textContent = Number.isNaN(s.inertia) ? '·' : s.inertia.toFixed(3);
+    out('status').textContent =
+      s.converged && pos === history.length - 1
+        ? 'convergido'
+        : playing
+          ? 'en marcha'
+          : pos === 0 && s.phase === 'inicio'
+            ? 'listo'
+            : pos < history.length - 1
+              ? 'repasando'
+              : 'pausado';
+    const atEnd = pos === history.length - 1 && last().converged;
+    btn('play').textContent = playing ? 'pausar' : 'reproducir';
+    btn('play').disabled = atEnd;
+    btn('step').disabled = atEnd;
+    btn('back').disabled = pos === 0;
+  }
+
+  function computeRun() {
+    let guard = 0;
+    while (!lloyd.converged && guard++ < 120) computeIteration();
+  }
+
+  function forward(animate = true): boolean {
+    if (pos >= history.length - 1) return false;
+    pos++;
+    display(animate);
+    return true;
+  }
+
+  function back() {
+    if (pos === 0) return;
+    pos--;
+    display();
+  }
+
+  // ---- reproducir ----
+  let playing = false;
+  let timer: ReturnType<typeof setTimeout> | null = null;
+
+  function stopPlay() {
     playing = false;
     if (timer) clearTimeout(timer);
     timer = null;
-    refresh();
   }
 
   function play() {
-    if (playing || finished()) return;
+    if (playing) return;
     playing = true;
     const loop = () => {
       if (!playing) return;
-      beat();
-      if (finished()) stop();
-      else timer = setTimeout(loop, 650);
+      if (forward()) timer = setTimeout(loop, 650);
+      else stopPlay();
+      display();
     };
     loop();
   }
 
-  function reset() {
-    stop();
-    lloyd.init(points, 3, seed);
-    phase = 'assign';
-    renderer.setState({ points, labels: lloyd.labels, centroids: lloyd.centroids }, false);
-    refresh();
+  function reinit() {
+    stopPlay();
+    lloyd.init(points, k, seed + dataSeed);
+    const rand = mulberry32((seed + dataSeed) * 9973 + k);
+    for (let j = 0; j < lloyd.centroids.length; j++) {
+      lloyd.centroids[j] = { x: 0.08 + rand() * 0.84, y: 0.08 + rand() * 0.84 };
+    }
+    history = [fromLloyd('inicio', [], 0)];
+    pos = 0;
+    computeRun();
+    display(false);
   }
 
-  btn('beat').addEventListener('click', () => {
-    stop();
-    beat();
+  // ---- controles ----
+  btn('play').addEventListener('click', () => {
+    if (playing) {
+      stopPlay();
+      display();
+    } else {
+      play();
+    }
   });
-  btn('play').addEventListener('click', () => (playing ? stop() : play()));
-  btn('reset').addEventListener('click', reset);
-  root.addEventListener('contentvisibilityautostatechange', (ev) => {
-    if ((ev as ContentVisibilityAutoStateChangeEvent).skipped) stop();
+  btn('step').addEventListener('click', () => {
+    stopPlay();
+    forward();
+  });
+  btn('back').addEventListener('click', () => {
+    stopPlay();
+    back();
+  });
+  btn('reset').addEventListener('click', reinit);
+  btn('regen').addEventListener('click', () => {
+    dataSeed++;
+    points = SHAPES[shape]!(dataSeed, 150);
+    reinit();
   });
 
-  reset();
+  posInput.addEventListener('input', () => {
+    stopPlay();
+    pos = Number(posInput.value);
+    display(false);
+  });
+
+  kInput.addEventListener('input', () => {
+    k = Number(kInput.value);
+    out('k').textContent = kInput.value;
+    reinit();
+  });
+
+  for (const b of root.querySelectorAll<HTMLButtonElement>('.seg-btn')) {
+    b.addEventListener('click', () => {
+      shape = b.dataset.shape!;
+      for (const other of root.querySelectorAll('.seg-btn')) {
+        other.setAttribute('aria-pressed', String(other === b));
+      }
+      points = SHAPES[shape]!(dataSeed, 150);
+      reinit();
+    });
+  }
+
+  // flechas del teclado
+  let inView = false;
+  new IntersectionObserver(
+    (entries) => {
+      for (const e of entries) inView = e.isIntersecting;
+    },
+    { threshold: 0.25 },
+  ).observe(root);
+
+  document.addEventListener('keydown', (ev) => {
+    if (!inView || (ev.key !== 'ArrowLeft' && ev.key !== 'ArrowRight')) return;
+    const t = ev.target as HTMLElement;
+    if (t instanceof HTMLInputElement && t !== posInput) return;
+    ev.preventDefault();
+    stopPlay();
+    if (ev.key === 'ArrowRight') forward();
+    else back();
+  });
+
+  // ---- interacción con el lienzo ----
+  const clamp01 = (v: number) => Math.min(0.98, Math.max(0.02, v));
+  let dragCentroid = -1;
+  let dragPoint = -1;
+  let hoverCentroid = -1;
+
+  const hitCentroid = (p: Point) => {
+    const tol = renderer.pxToData(14);
+    let best = -1;
+    let bestD = tol * tol;
+    current().centroids.forEach((c, j) => {
+      const d = (c.x - p.x) ** 2 + (c.y - p.y) ** 2;
+      if (d < bestD) {
+        bestD = d;
+        best = j;
+      }
+    });
+    return best;
+  };
+
+  const hitPoint = (p: Point) => {
+    const tol = renderer.pxToData(11);
+    let best = -1;
+    let bestD = tol * tol;
+    points.forEach((q, i) => {
+      const d = (q.x - p.x) ** 2 + (q.y - p.y) ** 2;
+      if (d < bestD) {
+        bestD = d;
+        best = i;
+      }
+    });
+    return best;
+  };
+
+  renderer.setOverlay((ctx, map) => {
+    const s = current();
+    if (s.phase === 'asignacion' && s.changed.length > 0) {
+      ctx.lineWidth = 1.2;
+      ctx.strokeStyle = 'rgb(26 26 26 / 0.55)';
+      for (const i of s.changed) {
+        const q = points[i];
+        if (!q) continue;
+        ctx.beginPath();
+        ctx.arc(map.x(q.x), map.y(q.y), 6.5, 0, Math.PI * 2);
+        ctx.stroke();
+      }
+    }
+    if (hoverCentroid >= 0) {
+      const c = s.centroids[hoverCentroid];
+      if (c) {
+        ctx.beginPath();
+        ctx.arc(map.x(c.x), map.y(c.y), 13, 0, Math.PI * 2);
+        ctx.lineWidth = 2;
+        ctx.strokeStyle = accent;
+        ctx.stroke();
+      }
+    }
+  });
+
+  function setHoverCentroid(j: number) {
+    if (j === hoverCentroid) return;
+    hoverCentroid = j;
+    display(false);
+  }
+
+  canvas.addEventListener('pointerdown', (ev) => {
+    hint.classList.add('is-hidden');
+    stopPlay();
+    const p = renderer.eventToData(ev);
+    const cIdx = hitCentroid(p);
+    if (cIdx >= 0) {
+      restore(current());
+      history = history.slice(0, pos + 1);
+      dragCentroid = cIdx;
+      canvas.style.cursor = 'grabbing';
+      canvas.setPointerCapture(ev.pointerId);
+      return;
+    }
+    const pIdx = hitPoint(p);
+    if (pIdx >= 0) {
+      dragPoint = pIdx;
+      canvas.style.cursor = 'grabbing';
+      canvas.setPointerCapture(ev.pointerId);
+    } else {
+      points.push({ x: clamp01(p.x), y: clamp01(p.y) });
+      reinit();
+    }
+  });
+
+  canvas.addEventListener('pointermove', (ev) => {
+    const p = renderer.eventToData(ev);
+    if (dragCentroid >= 0) {
+      lloyd.centroids[dragCentroid] = { x: clamp01(p.x), y: clamp01(p.y) };
+      lloyd.converged = false;
+      lloyd.metrics.inertia = inertia(points, lloyd.centroids, lloyd.labels);
+      history[pos] = fromLloyd(current().phase, [], 0);
+      display(false);
+      return;
+    }
+    if (dragPoint >= 0) {
+      points[dragPoint] = { x: clamp01(p.x), y: clamp01(p.y) };
+      display(false);
+      return;
+    }
+    const cIdx = hitCentroid(p);
+    setHoverCentroid(cIdx);
+    canvas.style.cursor = cIdx >= 0 || hitPoint(p) >= 0 ? 'grab' : 'crosshair';
+  });
+
+  canvas.addEventListener('pointerup', () => {
+    if (dragCentroid >= 0) {
+      dragCentroid = -1;
+      canvas.style.cursor = 'grab';
+      computeRun();
+      display();
+      return;
+    }
+    if (dragPoint >= 0) {
+      dragPoint = -1;
+      canvas.style.cursor = 'grab';
+      reinit();
+    }
+  });
+
+  canvas.addEventListener('pointerleave', () => setHoverCentroid(-1));
+  canvas.style.cursor = 'crosshair';
+
+  root.addEventListener('contentvisibilityautostatechange', (ev) => {
+    if ((ev as ContentVisibilityAutoStateChangeEvent).skipped) {
+      stopPlay();
+      display();
+    }
+  });
+
+  // gancho para verificación
+  (window as unknown as Record<string, unknown>).__labLloyd = {
+    centroids: () => current().centroids.map((c) => ({ ...c })),
+    pos: () => pos,
+    length: () => history.length,
+    phase: () => current().phase,
+    points: () => points.map((p) => ({ ...p })),
+  };
+
+  reinit();
 </script>

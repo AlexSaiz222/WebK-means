@@ -104,7 +104,7 @@ export class HartiganWong implements Clusterer {
       }
       this.metrics.distanceComputations += k;
 
-      // mover solo si hay mejora estricta de la función objetivo
+      // mover solo si hay mejora estricta de la inercia (reducción)
       if (bestJ >= 0 && bestCost < gain - 1e-12) {
         this.moveOut(ci, p);
         this.moveIn(bestJ, p);

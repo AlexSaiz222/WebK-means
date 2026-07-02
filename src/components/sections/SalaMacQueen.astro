@@ -17,7 +17,8 @@
     </p>
     <p>
       Haz clic en el lienzo: cada punto que sueltes arrastra consigo a su
-      centroide. Y hay un precio: al decidir sobre la marcha, el
+      centroide al instante. También puedes arrastrar puntos o centroides existentes
+      para reconfigurar el agrupamiento. Y hay un precio: al decidir sobre la marcha, el
       <strong>orden de llegada importa</strong>. Pulsa <em>barajar orden</em>
       para rehacer el agrupamiento con los mismos datos en otro orden y puede
       salir otra cosa. A Lloyd, que trabaja por lotes, eso no le pasa.
@@ -26,17 +27,47 @@
 
   <div class="lab reveal">
     <div class="panel">
+      <div class="controls toolbar">
+        <div class="seg" role="group" aria-label="forma de los datos">
+          <button class="seg-btn" data-shape="redondos" aria-pressed="true">redondos</button>
+          <button class="seg-btn" data-shape="alargados" aria-pressed="false">alargados</button>
+          <button class="seg-btn" data-shape="desiguales" aria-pressed="false">desiguales</button>
+          <button class="seg-btn" data-shape="lunas" aria-pressed="false">lunas</button>
+        </div>
+        <button class="btn" data-action="regen">otra muestra</button>
+        <button class="btn" data-action="shuffle">barajar orden</button>
+        <label class="field">
+          k = <output data-out="k">4</output>
+          <input type="range" min="2" max="6" step="1" value="4" data-in="k" aria-label="número de grupos k" />
+        </label>
+      </div>
       <div class="canvas-wrap">
         <canvas aria-label="Sandbox online de MacQueen: cada punto nuevo desplaza su centroide al instante"></canvas>
-        <p class="hint" data-hint>haz clic para soltar un punto nuevo</p>
+        <p class="hint" data-hint>arrastra puntos o centroides · clic para soltar un punto nuevo</p>
       </div>
-      <div class="controls">
-        <button class="btn btn-primary" data-action="shuffle">barajar orden</button>
+      <div class="controls timeline">
+        <button class="btn btn-primary" data-action="play">reproducir</button>
+        <button class="btn arrow" data-action="back" aria-label="fase anterior">←</button>
+        <input
+          type="range"
+          min="0"
+          max="0"
+          step="1"
+          value="0"
+          data-in="pos"
+          aria-label="posición en la ejecución"
+        />
+        <button class="btn arrow" data-action="step" aria-label="fase siguiente">→</button>
+        <output class="caption" data-out="pos-label">paso 0 de 0</output>
         <button class="btn" data-action="reset">reiniciar</button>
+      </div>
+      <div class="narration-box">
+        <span class="phase-chip" data-out="phase">inicio</span>
+        <p class="narration" data-out="narration">·</p>
       </div>
       <dl class="metrics">
         <div class="metric">
-          <dt>puntos</dt>
+          <dt>puntos procesados</dt>
           <dd data-out="count">0</dd>
         </div>
         <div class="metric">
@@ -53,76 +84,502 @@
 </section>
 
 <script>
-  import { MacQueen } from '../../lib/algorithms/macqueen.ts';
+
+  import { kmeansPlusPlus, mulberry32, inertia } from '../../lib/algorithms/kmeans-base.ts';
   import type { Point } from '../../lib/algorithms/types.ts';
-  import { unevenDensities } from '../../lib/data/datasets.ts';
+  import { blobs, anisotropic, unevenDensities, moons } from '../../lib/data/datasets.ts';
   import { CanvasRenderer } from '../../lib/sim/renderer.ts';
 
   const root = document.getElementById('sala-macqueen')!;
   const canvas = root.querySelector('canvas')!;
   const out = (n: string) => root.querySelector<HTMLElement>(`[data-out="${n}"]`)!;
   const btn = (a: string) => root.querySelector<HTMLButtonElement>(`[data-action="${a}"]`)!;
+  const hint = root.querySelector<HTMLElement>('[data-hint]')!;
+  const posInput = root.querySelector<HTMLInputElement>('[data-in="pos"]')!;
+  const kInput = root.querySelector<HTMLInputElement>('[data-in="k"]')!;
+
+  const SHAPES: Record<string, (seed: number, n: number) => Point[]> = {
+    redondos: blobs,
+    alargados: anisotropic,
+    desiguales: unevenDensities,
+    lunas: moons,
+  };
 
   const seed = 9;
-  const k = 4;
-  const base = unevenDensities(17, 140);
-  let points: Point[] = [];
-  let mq = new MacQueen();
-  let shuffleSeed = 100;
-  let originalLabels: number[] = [];
+  let shape = 'desiguales';
+  let dataSeed = 17;
+  let k = 4;
+  let points: Point[] = SHAPES[shape]!(dataSeed, 80);
+
   const renderer = new CanvasRenderer(canvas);
+  const accent =
+    getComputedStyle(canvas).getPropertyValue('--accent').trim() || '#2D5BFF';
 
-  function runToEnd(m: MacQueen) {
-    let guard = 0;
-    while (m.step() && guard++ < 200);
+  // ---- historial ----
+  interface HistoryFrame {
+    phase: string;
+    pointIndex: number;
+    labels: number[];
+    centroids: Point[];
+    counts: number[];
+    inertia: number;
+    iteration: number;
+    converged: boolean;
   }
 
-  function refresh(verdict = '·') {
-    out('count').textContent = String(points.length);
-    out('inertia').textContent = Number.isNaN(mq.metrics.inertia)
-      ? '·'
-      : mq.metrics.inertia.toFixed(3);
-    out('verdict').textContent = verdict;
-    renderer.setState({ points, labels: mq.labels, centroids: mq.centroids });
+  let history: HistoryFrame[] = [];
+  let pos = 0;
+  let shuffleActive = false;
+  let shuffleSeed = 100;
+  let originalInertia = NaN;
+  let initialCentroids: Point[] = [];
+  let initialCentroidsOverride: Point[] | null = null;
+
+  const current = () => history[pos]!;
+  const last = () => history[history.length - 1]!;
+
+  function computeOriginalRunInertia() {
+    // Calculamos el final sin barajar para comparar inercia
+    const kk = Math.min(k, points.length);
+    let tmpCentroids = initialCentroids.map(c => ({ ...c }));
+    let tmpCounts = new Array(kk).fill(1);
+    let tmpLabels = new Array(points.length).fill(-1);
+    const order = points.map((_, i) => i);
+
+    let converged = false;
+    let pass = 0;
+    while (!converged && pass++ < 10) {
+      let changes = 0;
+      for (let i of order) {
+        const p = points[i]!;
+        let best = 0;
+        let bestD = Infinity;
+        for (let j = 0; j < tmpCentroids.length; j++) {
+          const d = (tmpCentroids[j].x - p.x) ** 2 + (tmpCentroids[j].y - p.y) ** 2;
+          if (d < bestD) {
+            bestD = d;
+            best = j;
+          }
+        }
+        const prev = tmpLabels[i]!;
+        if (prev !== best) {
+          if (prev === -1 || tmpCounts[prev]! > 1) {
+            if (prev !== -1) {
+              const nPrev = tmpCounts[prev]! - 1;
+              tmpCounts[prev] = nPrev;
+              tmpCentroids[prev]!.x += (tmpCentroids[prev]!.x - p.x) / nPrev;
+              tmpCentroids[prev]!.y += (tmpCentroids[prev]!.y - p.y) / nPrev;
+            }
+            const nNew = tmpCounts[best]! + 1;
+            tmpCounts[best] = nNew;
+            tmpCentroids[best]!.x += (p.x - tmpCentroids[best]!.x) / nNew;
+            tmpCentroids[best]!.y += (p.y - tmpCentroids[best]!.y) / nNew;
+            tmpLabels[i] = best;
+            changes++;
+          }
+        }
+      }
+      if (changes === 0) converged = true;
+    }
+    originalInertia = inertia(points, tmpCentroids, tmpLabels);
   }
 
-  function reset() {
-    points = base.map((p) => ({ ...p }));
-    mq = new MacQueen();
-    mq.init(points, k, seed);
-    runToEnd(mq);
-    originalLabels = [...mq.labels];
-    shuffleSeed = 100;
-    refresh('orden original');
+  function computeMacQueenRun() {
+    const kk = Math.min(k, points.length);
+    let currentCentroids = initialCentroids.map(c => ({ ...c }));
+    let currentCounts = new Array(kk).fill(1);
+    let currentLabels = new Array(points.length).fill(-1);
+
+    history.push({
+      phase: 'inicio',
+      pointIndex: -1,
+      labels: [...currentLabels],
+      centroids: currentCentroids.map(c => ({ ...c })),
+      counts: [...currentCounts],
+      inertia: inertia(points, currentCentroids, currentLabels),
+      iteration: 0,
+      converged: false
+    });
+
+    let converged = false;
+    const order = points.map((_, i) => i);
+    if (shuffleActive) {
+      const rand = mulberry32(shuffleSeed);
+      for (let i = order.length - 1; i > 0; i--) {
+        const j = Math.floor(rand() * (i + 1));
+        const t = order[i]!;
+        order[i] = order[j]!;
+        order[j] = t;
+      }
+    }
+
+    let pass = 0;
+    const maxPasses = 8;
+    while (!converged && pass++ < maxPasses) {
+      let changes = 0;
+      for (let stepIndex = 0; stepIndex < order.length; stepIndex++) {
+        const i = order[stepIndex]!;
+        const p = points[i]!;
+        let best = 0;
+        let bestD = Infinity;
+        for (let j = 0; j < currentCentroids.length; j++) {
+          const d = (currentCentroids[j].x - p.x) ** 2 + (currentCentroids[j].y - p.y) ** 2;
+          if (d < bestD) {
+            bestD = d;
+            best = j;
+          }
+        }
+
+        const prev = currentLabels[i]!;
+        if (prev !== best) {
+          if (prev === -1 || currentCounts[prev]! > 1) {
+            if (prev !== -1) {
+              const nPrev = currentCounts[prev]! - 1;
+              currentCounts[prev] = nPrev;
+              currentCentroids[prev]!.x += (currentCentroids[prev]!.x - p.x) / nPrev;
+              currentCentroids[prev]!.y += (currentCentroids[prev]!.y - p.y) / nPrev;
+            }
+            const nNew = currentCounts[best]! + 1;
+            currentCounts[best] = nNew;
+            currentCentroids[best]!.x += (p.x - currentCentroids[best]!.x) / nNew;
+            currentCentroids[best]!.y += (p.y - currentCentroids[best]!.y) / nNew;
+
+            currentLabels[i] = best;
+            changes++;
+          }
+        }
+
+        history.push({
+          phase: 'ingesta',
+          pointIndex: i,
+          labels: [...currentLabels],
+          centroids: currentCentroids.map(c => ({ ...c })),
+          counts: [...currentCounts],
+          inertia: inertia(points, currentCentroids, currentLabels),
+          iteration: pass,
+          converged: false
+        });
+      }
+
+      if (changes === 0) converged = true;
+    }
+
+    history[history.length - 1]!.converged = true;
   }
 
-  btn('reset').addEventListener('click', reset);
+  function narration(): string {
+    const s = current();
+    if (s.phase === 'inicio') {
+      return (
+        'Semillas de clúster colocadas. Pulsa <strong>reproducir</strong> o avanza con <strong>→</strong> ' +
+        'para ver la asignación online punto por punto.'
+      );
+    }
+    const colorIdx = s.labels[s.pointIndex]!;
+    return (
+      `Procesando punto #${s.pointIndex + 1} (pasada ${s.iteration}). ` +
+      `Se asigna al clúster ${colorIdx + 1} e incrementa/desplaza su centroide de inmediato en vivo.`
+    );
+  }
 
+  function display(animate = true) {
+    const s = current();
+    renderer.setState({ points, labels: s.labels, centroids: s.centroids }, animate);
+    const total = history.length - 1;
+    posInput.max = String(total);
+    posInput.value = String(pos);
+    posInput.style.setProperty('--p', `${total > 0 ? (pos / total) * 100 : 0}%`);
+    out('pos-label').textContent = `paso ${pos} de ${total}`;
+    out('phase').textContent =
+      s.phase === 'ingesta'
+        ? `pasada ${s.iteration} · online`
+        : 'inicio';
+    out('narration').innerHTML = narration();
+    out('count').textContent = s.phase === 'ingesta' ? `${pos} / ${points.length}` : '0';
+    out('inertia').textContent = Number.isNaN(s.inertia) ? '·' : s.inertia.toFixed(3);
+
+    // Comparar veredicto con el orden original
+    if (!shuffleActive) {
+      out('verdict').textContent = 'orden original';
+    } else {
+      const finalInertia = last().inertia;
+      const diff = Math.abs(finalInertia - originalInertia);
+      out('verdict').textContent = diff < 1e-5 ? 'mismo resultado' : 'resultado diferente!';
+    }
+
+    const atEnd = pos === history.length - 1 && last().converged;
+    btn('play').textContent = playing ? 'pausar' : 'reproducir';
+    btn('play').disabled = atEnd;
+    btn('step').disabled = atEnd;
+    btn('back').disabled = pos === 0;
+  }
+
+  function forward(animate = true): boolean {
+    if (pos >= history.length - 1) return false;
+    pos++;
+    display(animate);
+    return true;
+  }
+
+  function back() {
+    if (pos === 0) return;
+    pos--;
+    display();
+  }
+
+  // ---- reproducir ----
+  let playing = false;
+  let timer: ReturnType<typeof setTimeout> | null = null;
+
+  function stopPlay() {
+    playing = false;
+    if (timer) clearTimeout(timer);
+    timer = null;
+  }
+
+  function play() {
+    if (playing) return;
+    playing = true;
+    const loop = () => {
+      if (!playing) return;
+      if (forward()) timer = setTimeout(loop, 120); // Faster stepping for point-by-point
+      else stopPlay();
+      display();
+    };
+    loop();
+  }
+
+  function reinit() {
+    stopPlay();
+    const kk = Math.min(k, points.length);
+    if (!initialCentroidsOverride || initialCentroidsOverride.length !== kk) {
+      const { centroids } = kmeansPlusPlus(points, kk, mulberry32(seed + dataSeed));
+      initialCentroids = centroids.map(c => ({ ...c }));
+    } else {
+      initialCentroids = initialCentroidsOverride.map(c => ({ ...c }));
+    }
+    history = [];
+    computeMacQueenRun();
+    computeOriginalRunInertia();
+    pos = 0;
+    display(false);
+  }
+
+  // ---- controles ----
+  btn('play').addEventListener('click', () => {
+    if (playing) {
+      stopPlay();
+      display();
+    } else {
+      play();
+    }
+  });
+  btn('step').addEventListener('click', () => {
+    stopPlay();
+    forward();
+  });
+  btn('back').addEventListener('click', () => {
+    stopPlay();
+    back();
+  });
+  btn('reset').addEventListener('click', () => {
+    shuffleActive = false;
+    initialCentroidsOverride = null;
+    btn('shuffle').setAttribute('aria-pressed', 'false');
+    reinit();
+  });
+  btn('regen').addEventListener('click', () => {
+    dataSeed++;
+    points = SHAPES[shape]!(dataSeed, 80);
+    initialCentroidsOverride = null;
+    reinit();
+  });
   btn('shuffle').addEventListener('click', () => {
-    // mismos datos, misma inicialización, distinto orden de llegada
-    const data = points.map((p) => ({ ...p }));
-    const rerun = new MacQueen();
-    rerun.init(data, k, seed);
-    rerun.shuffleOrder(++shuffleSeed);
-    runToEnd(rerun);
-    const same =
-      rerun.labels.length === originalLabels.length &&
-      rerun.labels.every((l, i) => l === originalLabels[i]);
-    points = data;
-    mq = rerun;
-    refresh(same ? 'mismo resultado' : 'resultado distinto');
+    shuffleActive = !shuffleActive;
+    btn('shuffle').setAttribute('aria-pressed', String(shuffleActive));
+    if (shuffleActive) shuffleSeed++;
+    reinit();
   });
 
-  // ingesta online: cada clic añade un punto y su centroide se desplaza ya
+  posInput.addEventListener('input', () => {
+    stopPlay();
+    pos = Number(posInput.value);
+    display(false);
+  });
+
+  kInput.addEventListener('input', () => {
+    k = Number(kInput.value);
+    out('k').textContent = kInput.value;
+    initialCentroidsOverride = null;
+    reinit();
+  });
+
+  for (const b of root.querySelectorAll<HTMLButtonElement>('.seg-btn')) {
+    b.addEventListener('click', () => {
+      shape = b.dataset.shape!;
+      for (const other of root.querySelectorAll('.seg-btn')) {
+        other.setAttribute('aria-pressed', String(other === b));
+      }
+      points = SHAPES[shape]!(dataSeed, 80);
+      initialCentroidsOverride = null;
+      reinit();
+    });
+  }
+
+  // flechas del teclado
+  let inView = false;
+  new IntersectionObserver(
+    (entries) => {
+      for (const e of entries) inView = e.isIntersecting;
+    },
+    { threshold: 0.25 },
+  ).observe(root);
+
+  document.addEventListener('keydown', (ev) => {
+    if (!inView || (ev.key !== 'ArrowLeft' && ev.key !== 'ArrowRight')) return;
+    const t = ev.target as HTMLElement;
+    if (t instanceof HTMLInputElement && t !== posInput) return;
+    ev.preventDefault();
+    stopPlay();
+    if (ev.key === 'ArrowRight') forward();
+    else back();
+  });
+
+  // ---- interacción con el lienzo ----
   const clamp01 = (v: number) => Math.min(0.98, Math.max(0.02, v));
-  const hint = root.querySelector<HTMLElement>('[data-hint]')!;
+  let dragCentroid = -1;
+  let dragPoint = -1;
+  let hoverCentroid = -1;
+
+  const hitCentroid = (p: Point) => {
+    const tol = renderer.pxToData(14);
+    let best = -1;
+    let bestD = tol * tol;
+    current().centroids.forEach((c, j) => {
+      const d = (c.x - p.x) ** 2 + (c.y - p.y) ** 2;
+      if (d < bestD) {
+        bestD = d;
+        best = j;
+      }
+    });
+    return best;
+  };
+
+  const hitPoint = (p: Point) => {
+    const tol = renderer.pxToData(11);
+    let best = -1;
+    let bestD = tol * tol;
+    points.forEach((q, i) => {
+      const d = (q.x - p.x) ** 2 + (q.y - p.y) ** 2;
+      if (d < bestD) {
+        bestD = d;
+        best = i;
+      }
+    });
+    return best;
+  };
+
+  renderer.setOverlay((ctx, map) => {
+    const s = current();
+    // Aro resaltando el punto procesado actual
+    if (s.phase === 'ingesta' && s.pointIndex >= 0) {
+      const q = points[s.pointIndex];
+      if (q) {
+        ctx.beginPath();
+        ctx.arc(map.x(q.x), map.y(q.y), 9, 0, Math.PI * 2);
+        ctx.lineWidth = 2.5;
+        ctx.strokeStyle = '#E65100'; // Naranja intenso
+        ctx.stroke();
+      }
+    }
+    if (hoverCentroid >= 0) {
+      const c = s.centroids[hoverCentroid];
+      if (c) {
+        ctx.beginPath();
+        ctx.arc(map.x(c.x), map.y(c.y), 13, 0, Math.PI * 2);
+        ctx.lineWidth = 2;
+        ctx.strokeStyle = accent;
+        ctx.stroke();
+      }
+    }
+  });
+
+  function setHoverCentroid(j: number) {
+    if (j === hoverCentroid) return;
+    hoverCentroid = j;
+    display(false);
+  }
+
   canvas.addEventListener('pointerdown', (ev) => {
     hint.classList.add('is-hidden');
+    stopPlay();
     const p = renderer.eventToData(ev);
-    mq.addPoint({ x: clamp01(p.x), y: clamp01(p.y) });
-    refresh('·');
+    const cIdx = hitCentroid(p);
+    if (cIdx >= 0) {
+      initialCentroidsOverride = history[0].centroids.map(c => ({ ...c }));
+      dragCentroid = cIdx;
+      canvas.style.cursor = 'grabbing';
+      canvas.setPointerCapture(ev.pointerId);
+      return;
+    }
+    const pIdx = hitPoint(p);
+    if (pIdx >= 0) {
+      dragPoint = pIdx;
+      canvas.style.cursor = 'grabbing';
+      canvas.setPointerCapture(ev.pointerId);
+    } else {
+      points.push({ x: clamp01(p.x), y: clamp01(p.y) });
+      initialCentroidsOverride = null;
+      reinit();
+    }
   });
+
+  canvas.addEventListener('pointermove', (ev) => {
+    const p = renderer.eventToData(ev);
+    if (dragCentroid >= 0) {
+      initialCentroidsOverride![dragCentroid] = { x: clamp01(p.x), y: clamp01(p.y) };
+      reinit();
+      return;
+    }
+    if (dragPoint >= 0) {
+      points[dragPoint] = { x: clamp01(p.x), y: clamp01(p.y) };
+      reinit();
+      return;
+    }
+    const cIdx = hitCentroid(p);
+    setHoverCentroid(cIdx);
+    canvas.style.cursor = cIdx >= 0 || hitPoint(p) >= 0 ? 'grab' : 'crosshair';
+  });
+
+  canvas.addEventListener('pointerup', () => {
+    if (dragCentroid >= 0) {
+      dragCentroid = -1;
+      canvas.style.cursor = 'grab';
+      return;
+    }
+    if (dragPoint >= 0) {
+      dragPoint = -1;
+      canvas.style.cursor = 'grab';
+    }
+  });
+
+  canvas.addEventListener('pointerleave', () => setHoverCentroid(-1));
   canvas.style.cursor = 'crosshair';
 
-  reset();
+  root.addEventListener('contentvisibilityautostatechange', (ev) => {
+    if ((ev as ContentVisibilityAutoStateChangeEvent).skipped) {
+      stopPlay();
+      display();
+    }
+  });
+
+  // gancho para verificación
+  (window as unknown as Record<string, unknown>).__labMacQueen = {
+    centroids: () => current().centroids.map((c) => ({ ...c })),
+    pos: () => pos,
+    length: () => history.length,
+    points: () => points.map((p) => ({ ...p })),
+  };
+
+  reinit();
 </script>

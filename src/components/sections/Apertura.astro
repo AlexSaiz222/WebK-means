@@ -9,22 +9,19 @@
 <header class="hero" id="apertura">
   <canvas aria-hidden="true"></canvas>
   <div class="prose">
-    <p class="kicker">una explicación explorable de K-Means</p>
+    <p class="kicker">Explora K-Means de forma interactiva.</p>
     <h1>
-      Un algoritmo,<br />
       <span class="cinco" translate="no"
-        ><span class="l1">c</span><span class="l2">i</span><span class="l3">n</span><span
-          class="l4">c</span><span class="l5">o</span></span
-      > personalidades.
+        ><span class="l1">C</span><span class="l2">i</span><span class="l3">n</span><span
+          class="l4">c</span><span class="l5">o</span></span> implementaciones para comprender el comportamiento de K-Means.
     </h1>
     <p class="sub">
-      ¿Por qué existen cinco versiones de un algoritmo que aparentemente hace
-      lo mismo? Esta página es la respuesta, y se responde tocando.
+      K-Means parece sencillo: inicializar centroides y asignar cada punto al más cercano. Sin embargo, pequeñas variaciones en su implementación pueden producir comportamientos muy diferentes. Experimenta con los datos, modifica los centroides y observa cómo cambia el proceso de agrupamiento.
     </p>
-    <p class="scroll-hint caption">
-      desliza para empezar
+    <div class="scroll-hint caption">
+      <span>desliza para empezar</span>
       <span class="scroll-line" aria-hidden="true"></span>
-    </p>
+    </div>
   </div>
 </header>
 
@@ -57,18 +54,28 @@
 
   .hero .prose {
     position: relative;
+    text-align: center;
+    max-width: 72ch;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
   }
 
   .kicker {
-    font-size: 0.85rem;
-    letter-spacing: 0.14em;
+    font-size: 0.9rem;
+    letter-spacing: 0.2em;
     text-transform: uppercase;
     color: var(--ink-soft);
-    margin-block-end: 20px;
+    margin-block-end: 24px;
+    font-weight: 500;
   }
 
   h1 {
     margin-block: 0;
+    font-size: clamp(2rem, 5.5vw, 3.8rem);
+    line-height: 1.15;
+    font-weight: 800;
+    text-wrap: balance;
   }
 
   .cinco .l1 { color: var(--c1); }
@@ -80,23 +87,26 @@
   .sub {
     font-size: clamp(1.1rem, 2vw, 1.35rem);
     color: var(--ink-soft);
-    max-width: 44ch;
-    margin-block-start: 24px;
+    max-width: 52ch;
+    margin-block-start: 28px;
+    line-height: 1.6;
+    text-wrap: balance;
   }
 
   .scroll-hint {
     display: flex;
+    flex-direction: column;
     align-items: center;
-    gap: 12px;
-    margin-block-start: 72px;
+    gap: 14px;
+    margin-block-start: 80px;
   }
 
   .scroll-line {
     display: inline-block;
-    width: 44px;
-    height: 1px;
-    background: var(--ink-soft);
-    transform-origin: left center;
+    width: 1px;
+    height: 48px;
+    background: linear-gradient(to bottom, var(--ink-soft), transparent);
+    transform-origin: top center;
   }
 
   @media (prefers-reduced-motion: no-preference) {
@@ -123,8 +133,8 @@
     }
 
     @keyframes scroll-pulse {
-      0%, 100% { scale: 0.35 1; opacity: 0.5; }
-      50% { scale: 1 1; opacity: 1; }
+      0%, 100% { transform: scaleY(0.35); opacity: 0.5; }
+      50% { transform: scaleY(1); opacity: 1; }
     }
   }
 </style>

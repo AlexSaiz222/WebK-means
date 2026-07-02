@@ -1,7 +1,7 @@
 ---
 /**
  * Sala 2.3 — Hartigan-Wong, la pregunta inteligente. Al pasar el ratón sobre
- * un punto se ve si moverlo a otro grupo reduce o no la función objetivo:
+ * un punto se ve si moverlo a otro grupo reduce o no la inercia:
  * solo se mueve si mejora, aunque el destino no sea el centroide más cercano.
  */
 ---
@@ -12,7 +12,7 @@
     <p>
       Las dos variantes anteriores preguntan «¿cuál es el centroide más
       cercano?». Hartigan-Wong hace una pregunta mejor: «si muevo este punto,
-      <strong>¿baja la función objetivo?</strong>». Mover un punto desplaza
+      <strong>¿baja la inercia?</strong>». Mover un punto desplaza
       <em>dos</em> centroides, el que lo pierde y el que lo gana, y la fórmula
       tiene en cuenta ambos efectos. Por eso un punto puede quedarse en un
       grupo cuyo centroide <em>no</em> es el más cercano, y por eso escapa
@@ -22,19 +22,49 @@
       Pasa el ratón sobre un punto: la línea continua es lo que se ganaría por
       salir de su grupo; la discontinua, lo que costaría entrar en el mejor
       candidato. Solo se muda si la ganancia supera al coste.
+      Puedes añadir puntos haciendo clic, arrastrarlos o desplazar los centroides
+      para recalcular el balance de inmediato.
     </p>
   </div>
 
   <div class="lab reveal">
     <div class="panel">
+      <div class="controls toolbar">
+        <div class="seg" role="group" aria-label="forma de los datos">
+          <button class="seg-btn" data-shape="redondos" aria-pressed="true">redondos</button>
+          <button class="seg-btn" data-shape="alargados" aria-pressed="false">alargados</button>
+          <button class="seg-btn" data-shape="desiguales" aria-pressed="false">desiguales</button>
+          <button class="seg-btn" data-shape="lunas" aria-pressed="false">lunas</button>
+        </div>
+        <button class="btn" data-action="regen">otra muestra</button>
+        <label class="field">
+          k = <output data-out="k">3</output>
+          <input type="range" min="2" max="6" step="1" value="3" data-in="k" aria-label="número de grupos k" />
+        </label>
+      </div>
       <div class="canvas-wrap">
         <canvas aria-label="Visualización de Hartigan-Wong: ganancia y coste de mover cada punto"></canvas>
-        <p class="hint" data-hint>pasa el ratón por un punto</p>
+        <p class="hint" data-hint>arrastra puntos/centroides · clic para añadir · pasa el ratón por un punto</p>
       </div>
-      <div class="controls">
+      <div class="controls timeline">
         <button class="btn btn-primary" data-action="play">reproducir</button>
-        <button class="btn" data-action="step">paso a paso</button>
+        <button class="btn arrow" data-action="back" aria-label="fase anterior">←</button>
+        <input
+          type="range"
+          min="0"
+          max="0"
+          step="1"
+          value="0"
+          data-in="pos"
+          aria-label="posición en la ejecución"
+        />
+        <button class="btn arrow" data-action="step" aria-label="fase siguiente">→</button>
+        <output class="caption" data-out="pos-label">paso 0 de 0</output>
         <button class="btn" data-action="reset">reiniciar</button>
+      </div>
+      <div class="narration-box">
+        <span class="phase-chip" data-out="phase">inicio</span>
+        <p class="narration" data-out="narration">·</p>
       </div>
       <dl class="metrics">
         <div class="metric">
@@ -44,6 +74,10 @@
         <div class="metric">
           <dt>Inercia</dt>
           <dd data-out="inertia">·</dd>
+        </div>
+        <div class="metric">
+          <dt>estado</dt>
+          <dd data-out="status">listo</dd>
         </div>
         <div class="metric">
           <dt>punto señalado</dt>
@@ -56,43 +90,302 @@
 
 <script>
   import { HartiganWong } from '../../lib/algorithms/hartigan-wong.ts';
-  import { anisotropic } from '../../lib/data/datasets.ts';
-  import { Engine } from '../../lib/sim/engine.ts';
+  import { inertia } from '../../lib/algorithms/kmeans-base.ts';
+  import type { Point } from '../../lib/algorithms/types.ts';
+  import { blobs, anisotropic, unevenDensities, moons } from '../../lib/data/datasets.ts';
   import { CanvasRenderer } from '../../lib/sim/renderer.ts';
 
   const root = document.getElementById('sala-hartigan')!;
   const canvas = root.querySelector('canvas')!;
   const out = (n: string) => root.querySelector<HTMLElement>(`[data-out="${n}"]`)!;
   const btn = (a: string) => root.querySelector<HTMLButtonElement>(`[data-action="${a}"]`)!;
+  const hint = root.querySelector<HTMLElement>('[data-hint]')!;
+  const posInput = root.querySelector<HTMLInputElement>('[data-in="pos"]')!;
+  const kInput = root.querySelector<HTMLInputElement>('[data-in="k"]')!;
+
+  const SHAPES: Record<string, (seed: number, n: number) => Point[]> = {
+    redondos: blobs,
+    alargados: anisotropic,
+    desiguales: unevenDensities,
+    lunas: moons,
+  };
 
   const seed = 12;
-  const points = anisotropic(23, 170);
+  let shape = 'alargados';
+  let dataSeed = 23;
+  let k = 3;
+  let points = SHAPES[shape]!(dataSeed, 150);
+
   const hw = new HartiganWong();
   const renderer = new CanvasRenderer(canvas);
-  let hovered = -1;
+  const accent =
+    getComputedStyle(canvas).getPropertyValue('--accent').trim() || '#2D5BFF';
 
-  const engine = new Engine(hw, {
-    onChange(c, e) {
-      renderer.setState({ points, labels: c.labels, centroids: c.centroids });
-      out('iteration').textContent = String(c.metrics.iteration);
-      out('inertia').textContent = Number.isNaN(c.metrics.inertia)
-        ? '·'
-        : c.metrics.inertia.toFixed(3);
-      btn('play').textContent = e.playing ? 'pausar' : 'reproducir';
-      btn('play').disabled = c.converged;
-      btn('step').disabled = c.converged;
-      probe(hovered); // el veredicto depende del estado actual
-    },
+  let hovered = -1;
+  let hoverCentroid = -1;
+
+  // ---- historial ----
+  interface HistoryFrame {
+    iteration: number;
+    inertia: number;
+    converged: boolean;
+    labels: number[];
+    centroids: Point[];
+    counts: number[];
+  }
+
+  let history: HistoryFrame[] = [];
+  let pos = 0;
+
+  const current = () => history[pos]!;
+  const last = () => history[history.length - 1]!;
+
+  function fromHW(): HistoryFrame {
+    return {
+      iteration: hw.metrics.iteration,
+      inertia: hw.metrics.inertia,
+      converged: hw.converged,
+      labels: [...hw.labels],
+      centroids: hw.centroids.map((c) => ({ ...c })),
+      // @ts-ignore
+      counts: [...hw.counts],
+    };
+  }
+
+  function restore(s: HistoryFrame) {
+    hw.metrics.iteration = s.iteration;
+    hw.metrics.inertia = s.inertia;
+    hw.converged = s.converged;
+    hw.labels = [...s.labels];
+    hw.centroids = s.centroids.map((c) => ({ ...c }));
+    // @ts-ignore
+    hw.counts = [...s.counts];
+    // @ts-ignore
+    hw.points = points;
+  }
+
+  function computeHartiganRun() {
+    let guard = 0;
+    while (!hw.converged && guard++ < 80) {
+      hw.step();
+      history.push(fromHW());
+    }
+  }
+
+  function narration(): string {
+    const s = current();
+    if (s.iteration === 0) {
+      return (
+        'Semillas iniciales asignadas al azar. Pulsa <strong>reproducir</strong> o avanza con <strong>→</strong> ' +
+        'para ver la evaluación iterativa de Hartigan-Wong.'
+      );
+    }
+    const conv = s.converged
+      ? ' El algoritmo no encuentra más reasignaciones ventajosas: <strong>convergido</strong>.'
+      : '';
+    return (
+      `Iteración ${s.iteration}. Cada punto es evaluado para ver si cambiarlo de clúster reduce la inercia global.` +
+      conv
+    );
+  }
+
+  function display(animate = true) {
+    const s = current();
+    restore(s);
+    renderer.setState({ points, labels: s.labels, centroids: s.centroids }, animate);
+    const total = history.length - 1;
+    posInput.max = String(total);
+    posInput.value = String(pos);
+    posInput.style.setProperty('--p', `${total > 0 ? (pos / total) * 100 : 0}%`);
+    out('pos-label').textContent = `paso ${pos} de ${total}`;
+    out('phase').textContent =
+      s.iteration > 0
+        ? `iteración ${s.iteration}`
+        : 'inicio';
+    out('narration').innerHTML = narration();
+    out('iteration').textContent = String(s.iteration);
+    out('inertia').textContent = Number.isNaN(s.inertia) ? '·' : s.inertia.toFixed(3);
+    out('status').textContent =
+      s.converged && pos === history.length - 1
+        ? 'convergido'
+        : playing
+          ? 'en marcha'
+          : pos === 0 && s.iteration === 0
+            ? 'listo'
+            : pos < history.length - 1
+              ? 'repasando'
+              : 'pausado';
+
+    const atEnd = pos === history.length - 1 && last().converged;
+    btn('play').textContent = playing ? 'pausar' : 'reproducir';
+    btn('play').disabled = atEnd;
+    btn('step').disabled = atEnd;
+    btn('back').disabled = pos === 0;
+
+    probe(hovered);
+  }
+
+  function forward(animate = true): boolean {
+    if (pos >= history.length - 1) return false;
+    pos++;
+    display(animate);
+    return true;
+  }
+
+  function back() {
+    if (pos === 0) return;
+    pos--;
+    display();
+  }
+
+  // ---- reproducir ----
+  let playing = false;
+  let timer: ReturnType<typeof setTimeout> | null = null;
+
+  function stopPlay() {
+    playing = false;
+    if (timer) clearTimeout(timer);
+    timer = null;
+  }
+
+  function play() {
+    if (playing) return;
+    playing = true;
+    const loop = () => {
+      if (!playing) return;
+      if (forward()) timer = setTimeout(loop, 700);
+      else stopPlay();
+      display();
+    };
+    loop();
+  }
+
+  function reinit() {
+    stopPlay();
+    hw.init(points, k, seed + dataSeed);
+    history = [fromHW()];
+    pos = 0;
+    computeHartiganRun();
+    display(false);
+  }
+
+  // ---- controles ----
+  btn('play').addEventListener('click', () => {
+    if (playing) {
+      stopPlay();
+      display();
+    } else {
+      play();
+    }
+  });
+  btn('step').addEventListener('click', () => {
+    stopPlay();
+    forward();
+  });
+  btn('back').addEventListener('click', () => {
+    stopPlay();
+    back();
+  });
+  btn('reset').addEventListener('click', reinit);
+  btn('regen').addEventListener('click', () => {
+    dataSeed++;
+    points = SHAPES[shape]!(dataSeed, 150);
+    reinit();
   });
 
-  const hint = root.querySelector<HTMLElement>('[data-hint]')!;
+  posInput.addEventListener('input', () => {
+    stopPlay();
+    pos = Number(posInput.value);
+    display(false);
+  });
 
-  /** Muestra ganancia/coste de mover el punto i y dibuja las dos líneas. */
+  kInput.addEventListener('input', () => {
+    k = Number(kInput.value);
+    out('k').textContent = kInput.value;
+    reinit();
+  });
+
+  for (const b of root.querySelectorAll<HTMLButtonElement>('.seg-btn')) {
+    b.addEventListener('click', () => {
+      shape = b.dataset.shape!;
+      for (const other of root.querySelectorAll('.seg-btn')) {
+        other.setAttribute('aria-pressed', String(other === b));
+      }
+      points = SHAPES[shape]!(dataSeed, 150);
+      reinit();
+    });
+  }
+
+  // flechas del teclado
+  let inView = false;
+  new IntersectionObserver(
+    (entries) => {
+      for (const e of entries) inView = e.isIntersecting;
+    },
+    { threshold: 0.25 },
+  ).observe(root);
+
+  document.addEventListener('keydown', (ev) => {
+    if (!inView || (ev.key !== 'ArrowLeft' && ev.key !== 'ArrowRight')) return;
+    const t = ev.target as HTMLElement;
+    if (t instanceof HTMLInputElement && t !== posInput) return;
+    ev.preventDefault();
+    stopPlay();
+    if (ev.key === 'ArrowRight') forward();
+    else back();
+  });
+
+  // ---- interacción con el lienzo ----
+  const clamp01 = (v: number) => Math.min(0.98, Math.max(0.02, v));
+  let dragCentroid = -1;
+  let dragPoint = -1;
+
+  const hitCentroid = (p: Point) => {
+    const tol = renderer.pxToData(14);
+    let best = -1;
+    let bestD = tol * tol;
+    current().centroids.forEach((c, j) => {
+      const d = (c.x - p.x) ** 2 + (c.y - p.y) ** 2;
+      if (d < bestD) {
+        bestD = d;
+        best = j;
+      }
+    });
+    return best;
+  };
+
+  const hitPoint = (p: Point) => {
+    const tol = renderer.pxToData(11);
+    let best = -1;
+    let bestD = tol * tol;
+    points.forEach((q, i) => {
+      const d = (q.x - p.x) ** 2 + (q.y - p.y) ** 2;
+      if (d < bestD) {
+        bestD = d;
+        best = i;
+      }
+    });
+    return best;
+  };
+
   function probe(i: number) {
     hovered = i;
     canvas.style.cursor = i >= 0 ? 'pointer' : 'default';
     if (i < 0) {
-      renderer.setOverlay(null);
+      if (hoverCentroid >= 0) {
+        renderer.setOverlay((ctx, map) => {
+          const c = current().centroids[hoverCentroid];
+          if (c) {
+            ctx.beginPath();
+            ctx.arc(map.x(c.x), map.y(c.y), 13, 0, Math.PI * 2);
+            ctx.lineWidth = 2;
+            ctx.strokeStyle = accent;
+            ctx.stroke();
+          }
+        });
+      } else {
+        renderer.setOverlay(null);
+      }
       out('probe').textContent = 'ninguno';
       return;
     }
@@ -109,8 +402,8 @@
       (moves ? 'se movería' : 'se queda');
 
     const p = points[i]!;
-    const from = hw.centroids[hw.labels[i]!]!;
-    const to = best >= 0 ? hw.centroids[best]! : null;
+    const from = current().centroids[current().labels[i]!]!;
+    const to = best >= 0 ? current().centroids[best]! : null;
     renderer.setOverlay((ctx, map) => {
       ctx.lineWidth = 1.5;
       ctx.strokeStyle = '#1A1A1A';
@@ -120,7 +413,7 @@
       ctx.stroke();
       if (to) {
         ctx.setLineDash([5, 4]);
-        ctx.strokeStyle = moves ? '#2D5BFF' : '#6B6B6B';
+        ctx.strokeStyle = moves ? accent : '#6B6B6B';
         ctx.beginPath();
         ctx.moveTo(map.x(p.x), map.y(p.y));
         ctx.lineTo(map.x(to.x), map.y(to.y));
@@ -130,10 +423,65 @@
       ctx.beginPath();
       ctx.arc(map.x(p.x), map.y(p.y), 6, 0, Math.PI * 2);
       ctx.stroke();
+
+      if (hoverCentroid >= 0) {
+        const c = current().centroids[hoverCentroid];
+        if (c) {
+          ctx.beginPath();
+          ctx.arc(map.x(c.x), map.y(c.y), 13, 0, Math.PI * 2);
+          ctx.lineWidth = 2;
+          ctx.strokeStyle = accent;
+          ctx.stroke();
+        }
+      }
     });
   }
 
+  canvas.addEventListener('pointerdown', (ev) => {
+    stopPlay();
+    const p = renderer.eventToData(ev);
+    const cIdx = hitCentroid(p);
+    if (cIdx >= 0) {
+      restore(current());
+      history = history.slice(0, pos + 1);
+      dragCentroid = cIdx;
+      canvas.style.cursor = 'grabbing';
+      canvas.setPointerCapture(ev.pointerId);
+      return;
+    }
+    const pIdx = hitPoint(p);
+    if (pIdx >= 0) {
+      dragPoint = pIdx;
+      canvas.style.cursor = 'grabbing';
+      canvas.setPointerCapture(ev.pointerId);
+    } else {
+      points.push({ x: clamp01(p.x), y: clamp01(p.y) });
+      reinit();
+    }
+  });
+
   canvas.addEventListener('pointermove', (ev) => {
+    const p = renderer.eventToData(ev);
+    if (dragCentroid >= 0) {
+      hw.centroids[dragCentroid] = { x: clamp01(p.x), y: clamp01(p.y) };
+      hw.converged = false;
+      hw.metrics.inertia = inertia(points, hw.centroids, hw.labels);
+      history[pos] = fromHW();
+      display(false);
+      return;
+    }
+    if (dragPoint >= 0) {
+      points[dragPoint] = { x: clamp01(p.x), y: clamp01(p.y) };
+      display(false);
+      return;
+    }
+
+    const cIdx = hitCentroid(p);
+    if (cIdx !== hoverCentroid) {
+      hoverCentroid = cIdx;
+      probe(hovered);
+    }
+
     const q = renderer.eventToData(ev);
     const tol = renderer.pxToData(10);
     let bestI = -1;
@@ -148,18 +496,43 @@
       }
     }
     if (bestI !== hovered) probe(bestI);
+    canvas.style.cursor = cIdx >= 0 || bestI >= 0 ? 'grab' : 'crosshair';
   });
-  canvas.addEventListener('pointerleave', () => probe(-1));
 
-  btn('step').addEventListener('click', () => {
-    engine.pause();
-    engine.step();
+  canvas.addEventListener('pointerup', () => {
+    if (dragCentroid >= 0) {
+      dragCentroid = -1;
+      canvas.style.cursor = 'grab';
+      computeHartiganRun();
+      display();
+      return;
+    }
+    if (dragPoint >= 0) {
+      dragPoint = -1;
+      canvas.style.cursor = 'grab';
+      reinit();
+    }
   });
-  btn('play').addEventListener('click', () => engine.toggle());
-  btn('reset').addEventListener('click', () => engine.setData(points, 3, seed));
+
+  canvas.addEventListener('pointerleave', () => {
+    hoverCentroid = -1;
+    probe(-1);
+  });
+
   root.addEventListener('contentvisibilityautostatechange', (ev) => {
-    if ((ev as ContentVisibilityAutoStateChangeEvent).skipped) engine.pause();
+    if ((ev as ContentVisibilityAutoStateChangeEvent).skipped) {
+      stopPlay();
+      display();
+    }
   });
 
-  engine.setData(points, 3, seed);
+  // gancho para verificación
+  (window as unknown as Record<string, unknown>).__labHartigan = {
+    centroids: () => current().centroids.map((c) => ({ ...c })),
+    pos: () => pos,
+    length: () => history.length,
+    points: () => points.map((p) => ({ ...p })),
+  };
+
+  reinit();
 </script>

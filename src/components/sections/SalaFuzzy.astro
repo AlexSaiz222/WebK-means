@@ -18,26 +18,56 @@
       imágenes, diagnóstico médico, perfiles de clientes.
     </p>
     <p>
-      El parámetro de borrosidad <em>m</em> controla la duda: cerca de 1 las
-      fronteras se endurecen hacia el K-Means clásico; con valores altos, todo
-      se difumina. Mueve el deslizador y pasa el ratón por los puntos de
-      frontera para leer sus porcentajes.
+      Pasa el ratón por los puntos tras converger: verás mezclas de pertenencia
+      reales, como «70 % de un grupo y 30 % de otro». Si reduces `m` a 1.2
+      (límites más rígidos), los colores vuelven a ser puros. Si lo subes, la
+      incertidumbre inunda el mapa.
+      Puedes añadir puntos haciendo clic, arrastrarlos o mover sus centroides para ver cómo cambian sus pertenencias.
     </p>
   </div>
 
   <div class="lab reveal">
     <div class="panel">
-      <div class="canvas-wrap">
-        <canvas aria-label="Visualización de Fuzzy C-Means: cada punto se colorea con la mezcla de sus pertenencias"></canvas>
-        <p class="hint" data-hint>pasa el ratón por un punto de frontera</p>
-      </div>
-      <div class="controls">
-        <button class="btn btn-primary" data-action="play">reproducir</button>
-        <button class="btn" data-action="reset">reiniciar</button>
+      <div class="controls toolbar">
+        <div class="seg" role="group" aria-label="forma de los datos">
+          <button class="seg-btn" data-shape="redondos" aria-pressed="false">redondos</button>
+          <button class="seg-btn" data-shape="alargados" aria-pressed="true">alargados</button>
+          <button class="seg-btn" data-shape="desiguales" aria-pressed="false">desiguales</button>
+          <button class="seg-btn" data-shape="lunas" aria-pressed="false">lunas</button>
+        </div>
+        <button class="btn" data-action="regen">otra muestra</button>
         <label class="field">
-          borrosidad m = <output data-out="m">2.0</output>
+          k = <output data-out="k">3</output>
+          <input type="range" min="2" max="6" step="1" value="3" data-in="k" aria-label="número de grupos k" />
+        </label>
+        <label class="field">
+          m = <output data-out="m">2.0</output>
           <input type="range" min="1.2" max="4" step="0.2" value="2" data-in="m" aria-label="parámetro de borrosidad m" />
         </label>
+      </div>
+      <div class="canvas-wrap">
+        <canvas aria-label="Visualización de Fuzzy C-Means: cada punto se colorea con la mezcla de sus pertenencias"></canvas>
+        <p class="hint" data-hint>arrastra puntos/centroides · clic para añadir · pasa el ratón por un punto</p>
+      </div>
+      <div class="controls timeline">
+        <button class="btn btn-primary" data-action="play">reproducir</button>
+        <button class="btn arrow" data-action="back" aria-label="fase anterior">←</button>
+        <input
+          type="range"
+          min="0"
+          max="0"
+          step="1"
+          value="0"
+          data-in="pos"
+          aria-label="posición en la ejecución"
+        />
+        <button class="btn arrow" data-action="step" aria-label="fase siguiente">→</button>
+        <output class="caption" data-out="pos-label">paso 0 de 0</output>
+        <button class="btn" data-action="reset">reiniciar</button>
+      </div>
+      <div class="narration-box">
+        <span class="phase-chip" data-out="phase">inicio</span>
+        <p class="narration" data-out="narration">·</p>
       </div>
       <dl class="metrics">
         <div class="metric">
@@ -45,8 +75,12 @@
           <dd data-out="iteration">0</dd>
         </div>
         <div class="metric">
-          <dt>función objetivo (SSE dura)</dt>
+          <dt>Inercia (dura)</dt>
           <dd data-out="inertia">·</dd>
+        </div>
+        <div class="metric">
+          <dt>estado</dt>
+          <dd data-out="status">listo</dd>
         </div>
         <div class="metric">
           <dt>punto señalado</dt>
@@ -59,58 +93,385 @@
 
 <script>
   import { Fuzzy } from '../../lib/algorithms/fuzzy.ts';
-  import { anisotropic } from '../../lib/data/datasets.ts';
-  import { Engine } from '../../lib/sim/engine.ts';
+  import { inertia } from '../../lib/algorithms/kmeans-base.ts';
+  import type { Point } from '../../lib/algorithms/types.ts';
+  import { blobs, anisotropic, unevenDensities, moons } from '../../lib/data/datasets.ts';
   import { CanvasRenderer } from '../../lib/sim/renderer.ts';
 
   const root = document.getElementById('sala-fuzzy')!;
   const canvas = root.querySelector('canvas')!;
   const out = (n: string) => root.querySelector<HTMLElement>(`[data-out="${n}"]`)!;
   const btn = (a: string) => root.querySelector<HTMLButtonElement>(`[data-action="${a}"]`)!;
+  const hint = root.querySelector<HTMLElement>('[data-hint]')!;
+  const posInput = root.querySelector<HTMLInputElement>('[data-in="pos"]')!;
+  const kInput = root.querySelector<HTMLInputElement>('[data-in="k"]')!;
+  const mInput = root.querySelector<HTMLInputElement>('[data-in="m"]')!;
+
+  const SHAPES: Record<string, (seed: number, n: number) => Point[]> = {
+    redondos: blobs,
+    alargados: anisotropic,
+    desiguales: unevenDensities,
+    lunas: moons,
+  };
 
   const seed = 8;
-  const k = 3;
-  const points = anisotropic(47, 180);
+  let shape = 'alargados';
+  let dataSeed = 47;
+  let k = 3;
+  let mVal = 2;
+  let points = SHAPES[shape]!(dataSeed, 150);
+
   const fuzzy = new Fuzzy();
   const renderer = new CanvasRenderer(canvas);
+  const accent =
+    getComputedStyle(canvas).getPropertyValue('--accent').trim() || '#2D5BFF';
   let hovered = -1;
+  let hoverCentroid = -1;
 
-  const engine = new Engine(fuzzy, {
-    stepMs: 350,
-    onChange(c, e) {
-      renderer.setState({
-        points,
-        labels: c.labels,
-        centroids: c.centroids,
-        memberships: fuzzy.memberships,
-      });
-      out('iteration').textContent = String(c.metrics.iteration);
-      out('inertia').textContent = Number.isNaN(c.metrics.inertia)
-        ? '·'
-        : c.metrics.inertia.toFixed(3);
-      btn('play').textContent = e.playing ? 'pausar' : 'reproducir';
-      btn('play').disabled = c.converged;
-      probe(hovered);
-    },
+  // ---- historial ----
+  interface HistoryFrame {
+    iteration: number;
+    inertia: number;
+    converged: boolean;
+    labels: number[];
+    centroids: Point[];
+    memberships: number[][];
+  }
+
+  let history: HistoryFrame[] = [];
+  let pos = 0;
+  const current = () => history[pos]!;
+  const last = () => history[history.length - 1]!;
+
+  function snapshot(): HistoryFrame {
+    return {
+      iteration: fuzzy.metrics.iteration,
+      inertia: fuzzy.metrics.inertia,
+      converged: fuzzy.converged,
+      labels: [...fuzzy.labels],
+      centroids: fuzzy.centroids.map(c => ({ ...c })),
+      memberships: fuzzy.memberships.map(row => [...row]),
+    };
+  }
+
+  function restore(s: HistoryFrame) {
+    fuzzy.metrics.iteration = s.iteration;
+    fuzzy.metrics.inertia = s.inertia;
+    fuzzy.converged = s.converged;
+    fuzzy.labels = [...s.labels];
+    fuzzy.centroids = s.centroids.map(c => ({ ...c }));
+    fuzzy.memberships = s.memberships.map(row => [...row]);
+    // @ts-ignore
+    fuzzy.points = points;
+  }
+
+  function computeFuzzyRun() {
+    let guard = 0;
+    while (!fuzzy.converged && guard++ < 80) {
+      fuzzy.step();
+      history.push(snapshot());
+    }
+  }
+
+  function narration(): string {
+    const s = current();
+    if (s.iteration === 0) {
+      return (
+        'Pertenencias iniciales al azar. Pulsa <strong>reproducir</strong> o <strong>→</strong> ' +
+        'para ver cómo las pertenencias se van ajustando y los colores convergen.'
+      );
+    }
+    const conv = s.converged
+      ? ' Las pertenencias apenas cambian: <strong>convergido</strong>.'
+      : '';
+    return (
+      `Iteración ${s.iteration}. Los centroides se recalculan como media ponderada (u<sup>m</sup>), ` +
+      `luego las pertenencias se actualizan con la regla fuzzy.${conv}`
+    );
+  }
+
+  function display(animate = true) {
+    const s = current();
+    restore(s);
+    renderer.setState({
+      points,
+      labels: s.labels,
+      centroids: s.centroids,
+      memberships: s.memberships,
+    }, animate);
+
+    const total = history.length - 1;
+    posInput.max = String(total);
+    posInput.value = String(pos);
+    posInput.style.setProperty('--p', `${total > 0 ? (pos / total) * 100 : 0}%`);
+    out('pos-label').textContent = `paso ${pos} de ${total}`;
+    out('phase').textContent = s.iteration > 0 ? `iteración ${s.iteration}` : 'inicio';
+    out('narration').innerHTML = narration();
+    out('iteration').textContent = String(s.iteration);
+    out('inertia').textContent = Number.isNaN(s.inertia) ? '·' : s.inertia.toFixed(3);
+    out('status').textContent =
+      s.converged && pos === history.length - 1
+        ? 'convergido'
+        : playing
+          ? 'en marcha'
+          : pos === 0 && s.iteration === 0
+            ? 'listo'
+            : pos < history.length - 1
+              ? 'repasando'
+              : 'pausado';
+
+    const atEnd = pos === history.length - 1 && last().converged;
+    btn('play').textContent = playing ? 'pausar' : 'reproducir';
+    btn('play').disabled = atEnd;
+    btn('step').disabled = atEnd;
+    btn('back').disabled = pos === 0;
+
+    probe(hovered);
+  }
+
+  function forward(animate = true): boolean {
+    if (pos >= history.length - 1) return false;
+    pos++;
+    display(animate);
+    return true;
+  }
+
+  function back() {
+    if (pos === 0) return;
+    pos--;
+    display();
+  }
+
+  // ---- reproducir ----
+  let playing = false;
+  let timer: ReturnType<typeof setTimeout> | null = null;
+
+  function stopPlay() {
+    playing = false;
+    if (timer) clearTimeout(timer);
+    timer = null;
+  }
+
+  function play() {
+    if (playing) return;
+    playing = true;
+    const loop = () => {
+      if (!playing) return;
+      if (forward()) timer = setTimeout(loop, 500);
+      else stopPlay();
+      display();
+    };
+    loop();
+  }
+
+  function reinit() {
+    stopPlay();
+    fuzzy.setM(mVal);
+    fuzzy.init(points, k, seed + dataSeed);
+    history = [snapshot()];
+    pos = 0;
+    computeFuzzyRun();
+    display(false);
+  }
+
+  // ---- controles ----
+  btn('play').addEventListener('click', () => {
+    if (playing) { stopPlay(); display(); }
+    else play();
+  });
+  btn('step').addEventListener('click', () => { stopPlay(); forward(); });
+  btn('back').addEventListener('click', () => { stopPlay(); back(); });
+  btn('reset').addEventListener('click', reinit);
+  btn('regen').addEventListener('click', () => {
+    dataSeed++;
+    points = SHAPES[shape]!(dataSeed, 150);
+    reinit();
   });
 
-  const hint = root.querySelector<HTMLElement>('[data-hint]')!;
+  posInput.addEventListener('input', () => {
+    stopPlay();
+    pos = Number(posInput.value);
+    display(false);
+  });
+
+  kInput.addEventListener('input', () => {
+    k = Number(kInput.value);
+    out('k').textContent = kInput.value;
+    reinit();
+  });
+
+  mInput.addEventListener('input', () => {
+    mVal = Number(mInput.value);
+    out('m').textContent = mVal.toFixed(1);
+    reinit();
+  });
+
+  for (const b of root.querySelectorAll<HTMLButtonElement>('.seg-btn')) {
+    b.addEventListener('click', () => {
+      shape = b.dataset.shape!;
+      for (const other of root.querySelectorAll('.seg-btn')) {
+        other.setAttribute('aria-pressed', String(other === b));
+      }
+      points = SHAPES[shape]!(dataSeed, 150);
+      reinit();
+    });
+  }
+
+  // ---- teclado ----
+  let inView = false;
+  new IntersectionObserver(
+    (entries) => { for (const e of entries) inView = e.isIntersecting; },
+    { threshold: 0.25 },
+  ).observe(root);
+
+  document.addEventListener('keydown', (ev) => {
+    if (!inView || (ev.key !== 'ArrowLeft' && ev.key !== 'ArrowRight')) return;
+    const t = ev.target as HTMLElement;
+    if (t instanceof HTMLInputElement && t !== posInput) return;
+    ev.preventDefault();
+    stopPlay();
+    if (ev.key === 'ArrowRight') forward();
+    else back();
+  });
+
+  // ---- interacción con el lienzo ----
+  const clamp01 = (v: number) => Math.min(0.98, Math.max(0.02, v));
+  let dragCentroid = -1;
+  let dragPoint = -1;
+
+  const hitCentroid = (p: Point) => {
+    const tol = renderer.pxToData(14);
+    let best = -1;
+    let bestD = tol * tol;
+    current().centroids.forEach((c, j) => {
+      const d = (c.x - p.x) ** 2 + (c.y - p.y) ** 2;
+      if (d < bestD) { bestD = d; best = j; }
+    });
+    return best;
+  };
+
+  const hitPoint = (p: Point) => {
+    const tol = renderer.pxToData(11);
+    let best = -1;
+    let bestD = tol * tol;
+    points.forEach((q, i) => {
+      const d = (q.x - p.x) ** 2 + (q.y - p.y) ** 2;
+      if (d < bestD) { bestD = d; best = i; }
+    });
+    return best;
+  };
 
   function probe(i: number) {
     hovered = i;
     canvas.style.cursor = i >= 0 ? 'pointer' : 'default';
     if (i < 0) {
+      if (hoverCentroid >= 0) {
+        renderer.setOverlay((ctx, map) => {
+          const c = current().centroids[hoverCentroid];
+          if (c) {
+            ctx.beginPath();
+            ctx.arc(map.x(c.x), map.y(c.y), 13, 0, Math.PI * 2);
+            ctx.lineWidth = 2;
+            ctx.strokeStyle = accent;
+            ctx.stroke();
+          }
+        });
+      } else {
+        renderer.setOverlay(null);
+      }
       out('probe').textContent = 'ninguno';
       return;
     }
     hint.classList.add('is-hidden');
-    const row = fuzzy.memberships[i]!;
-    out('probe').textContent = row
-      .map((u, j) => `${Math.round(u * 100)} % grupo ${j + 1}`)
-      .join(' · ');
+    const row = current().memberships[i];
+    if (row) {
+      out('probe').textContent = row
+        .map((u, j) => `${Math.round(u * 100)} % grupo ${j + 1}`)
+        .join(' · ');
+    }
   }
 
+  /** Recalculate memberships in-place for a given frame (used during drag). */
+  function recalcMemberships(s: HistoryFrame) {
+    const kk = s.centroids.length;
+    const exp = 2 / (mVal - 1);
+    const d = new Array<number>(kk).fill(0);
+    for (let i = 0; i < points.length; i++) {
+      let zero = -1;
+      for (let j = 0; j < kk; j++) {
+        d[j] = Math.hypot(points[i]!.x - s.centroids[j]!.x, points[i]!.y - s.centroids[j]!.y);
+        if (d[j]! < 1e-12) zero = j;
+      }
+      const row = s.memberships[i]!;
+      for (let j = 0; j < kk; j++) {
+        let u: number;
+        if (zero >= 0) {
+          u = j === zero ? 1 : 0;
+        } else {
+          let denom = 0;
+          for (let l = 0; l < kk; l++) denom += Math.pow(d[j]! / d[l]!, exp);
+          u = 1 / denom;
+        }
+        row[j] = u;
+      }
+      let best = 0;
+      let bestV = -1;
+      for (let j = 0; j < kk; j++) {
+        if (row[j]! > bestV) { bestV = row[j]!; best = j; }
+      }
+      s.labels[i] = best;
+    }
+  }
+
+  canvas.addEventListener('pointerdown', (ev) => {
+    stopPlay();
+    const p = renderer.eventToData(ev);
+    const cIdx = hitCentroid(p);
+    if (cIdx >= 0) {
+      restore(current());
+      history = history.slice(0, pos + 1);
+      dragCentroid = cIdx;
+      canvas.style.cursor = 'grabbing';
+      canvas.setPointerCapture(ev.pointerId);
+      return;
+    }
+    const pIdx = hitPoint(p);
+    if (pIdx >= 0) {
+      dragPoint = pIdx;
+      canvas.style.cursor = 'grabbing';
+      canvas.setPointerCapture(ev.pointerId);
+    } else {
+      points.push({ x: clamp01(p.x), y: clamp01(p.y) });
+      reinit();
+    }
+  });
+
   canvas.addEventListener('pointermove', (ev) => {
+    const p = renderer.eventToData(ev);
+    if (dragCentroid >= 0) {
+      const s = current();
+      s.centroids[dragCentroid] = { x: clamp01(p.x), y: clamp01(p.y) };
+      recalcMemberships(s);
+      s.inertia = inertia(points, s.centroids, s.labels);
+      history[pos] = s;
+      display(false);
+      return;
+    }
+    if (dragPoint >= 0) {
+      points[dragPoint] = { x: clamp01(p.x), y: clamp01(p.y) };
+      const s = current();
+      recalcMemberships(s);
+      history[pos] = s;
+      display(false);
+      return;
+    }
+
+    const cIdx = hitCentroid(p);
+    if (cIdx !== hoverCentroid) {
+      hoverCentroid = cIdx;
+      probe(hovered);
+    }
+
     const q = renderer.eventToData(ev);
     const tol = renderer.pxToData(10);
     let bestI = -1;
@@ -119,30 +480,46 @@
       const dx = points[i]!.x - q.x;
       const dy = points[i]!.y - q.y;
       const d = dx * dx + dy * dy;
-      if (d < bestD) {
-        bestD = d;
-        bestI = i;
-      }
+      if (d < bestD) { bestD = d; bestI = i; }
     }
     if (bestI !== hovered) probe(bestI);
-  });
-  canvas.addEventListener('pointerleave', () => probe(-1));
-
-  const mInput = root.querySelector<HTMLInputElement>('[data-in="m"]')!;
-  mInput.addEventListener('input', () => {
-    const m = Number(mInput.value);
-    out('m').textContent = m.toFixed(1);
-    // cambia la borrosidad en caliente y deja que reconverja en directo
-    fuzzy.setM(m);
-    engine.play();
+    canvas.style.cursor = cIdx >= 0 || bestI >= 0 ? 'grab' : 'crosshair';
   });
 
-  btn('play').addEventListener('click', () => engine.toggle());
-  btn('reset').addEventListener('click', () => engine.setData(points, k, seed));
+  canvas.addEventListener('pointerup', () => {
+    if (dragCentroid >= 0) {
+      dragCentroid = -1;
+      canvas.style.cursor = 'grab';
+      computeFuzzyRun();
+      display();
+      return;
+    }
+    if (dragPoint >= 0) {
+      dragPoint = -1;
+      canvas.style.cursor = 'grab';
+      reinit();
+    }
+  });
+
+  canvas.addEventListener('pointerleave', () => {
+    hoverCentroid = -1;
+    probe(-1);
+  });
+
   root.addEventListener('contentvisibilityautostatechange', (ev) => {
-    if ((ev as ContentVisibilityAutoStateChangeEvent).skipped) engine.pause();
+    if ((ev as ContentVisibilityAutoStateChangeEvent).skipped) {
+      stopPlay();
+      display();
+    }
   });
 
-  engine.setData(points, k, seed);
-  engine.play();
+  // gancho para verificación
+  (window as unknown as Record<string, unknown>).__labFuzzy = {
+    centroids: () => current().centroids.map(c => ({ ...c })),
+    pos: () => pos,
+    length: () => history.length,
+    points: () => points.map(p => ({ ...p })),
+  };
+
+  reinit();
 </script>

@@ -62,11 +62,16 @@ p {
   margin-block: 0 1em;
 }
 
-/* columna de lectura centrada y estrecha */
+/* columna de lectura alineada con los laboratorios */
 .prose {
-  max-width: 62ch;
+  max-width: 860px;
   margin-inline: auto;
   padding-inline: 24px;
+  margin-block-end: 48px;
+}
+
+.prose p {
+  max-width: 76ch;
 }
 
 .section {
@@ -242,5 +247,123 @@ input[type='range'] {
         translate: 0 24px;
       }
     }
+  }
+}
+
+/* ---- Controles compartidos de los laboratorios (toolbar, timeline, narración) ---- */
+
+.seg {
+  display: inline-flex;
+  border: 1px solid var(--line);
+  background: var(--surface);
+}
+
+.seg-btn {
+  font: inherit;
+  font-size: 0.9rem;
+  padding: 8px 14px;
+  border: none;
+  background: transparent;
+  color: var(--ink-soft);
+  cursor: pointer;
+  transition: color 120ms ease, background-color 120ms ease;
+}
+
+.seg-btn + .seg-btn {
+  border-left: 1px solid var(--line);
+}
+
+.seg-btn:hover:not([aria-pressed='true']) {
+  color: var(--ink);
+}
+
+.seg-btn:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: -2px;
+}
+
+.seg-btn[aria-pressed='true'] {
+  background: rgb(45 91 255 / 0.08);
+  color: var(--accent);
+  font-weight: 600;
+}
+
+.toolbar .field {
+  margin-left: auto;
+}
+
+.timeline input[type='range'] {
+  flex: 1;
+  min-width: 100px;
+  appearance: none;
+  height: 4px;
+  border-radius: 2px;
+  background: linear-gradient(
+    to right,
+    var(--accent) var(--p, 0%),
+    var(--line) var(--p, 0%)
+  );
+}
+
+.timeline input[type='range']::-webkit-slider-thumb {
+  appearance: none;
+  width: 14px;
+  height: 14px;
+  border-radius: 50%;
+  background: var(--accent);
+  border: 2px solid #fff;
+  box-shadow: 0 0 0 1px var(--line);
+}
+
+.timeline input[type='range']::-moz-range-thumb {
+  width: 12px;
+  height: 12px;
+  border-radius: 50%;
+  background: var(--accent);
+  border: 2px solid #fff;
+  box-shadow: 0 0 0 1px var(--line);
+}
+
+.timeline output {
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+
+.arrow {
+  padding: 8px 14px;
+}
+
+.narration-box {
+  display: flex;
+  align-items: baseline;
+  gap: 14px;
+  margin: 0 16px 16px;
+  padding: 14px 18px;
+  background: rgb(45 91 255 / 0.045);
+  border: 1px solid rgb(45 91 255 / 0.16);
+  border-left: 3px solid var(--accent);
+}
+
+.phase-chip {
+  flex-shrink: 0;
+  font-size: 0.7rem;
+  font-weight: 650;
+  letter-spacing: 0.09em;
+  text-transform: uppercase;
+  color: var(--accent);
+  border: 1px solid currentColor;
+  padding: 2px 9px;
+}
+
+.narration {
+  margin: 0;
+  font-size: 0.95rem;
+  min-height: 2.9em;
+}
+
+@media (max-width: 640px) {
+  .narration-box {
+    flex-direction: column;
+    gap: 8px;
   }
 }
