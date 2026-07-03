@@ -8,7 +8,9 @@ Cada sección combina una explicación breve con un laboratorio interactivo en
 el que se puede ejecutar el algoritmo paso a paso, modificar los datos y los
 centroides, y comprobar su comportamiento real sobre seis tipos de muestras.
 
-<!-- TODO: captura de la demo y enlace a la URL pública -->
+**Demo: [alexsaiz222.github.io/WebK-means](https://alexsaiz222.github.io/WebK-means/)**
+
+![Ejecución de Lloyd paso a paso con las fronteras de Voronoi activadas](docs/media/lloyd.gif)
 
 ## Contenido
 
@@ -36,6 +38,10 @@ Cada laboratorio añade la interacción que aísla la diferencia de su algoritmo
 | Hartigan-Wong | Al señalar un punto se compara la ganancia por salir de su clúster con el coste de entrar en el mejor candidato: solo se traslada si reduce la inercia total. |
 | Elkan | Ejecución en paralelo junto a Lloyd sobre los mismos datos y semilla: etiquetas idénticas con una fracción de los cálculos de distancia, gracias a la desigualdad triangular. |
 | Fuzzy K-Means | Grados de pertenencia representados como mezcla de color, con un deslizador para el parámetro de borrosidad `m`. |
+
+| | |
+|---|---|
+| ![Lloyd y Elkan en paralelo con contadores de distancias](docs/media/lab-elkan.png) | ![Curva del codo con vista previa del agrupamiento](docs/media/lab-elegir-k.png) |
 
 ## Verificación
 
