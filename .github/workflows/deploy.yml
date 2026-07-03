@@ -39,3 +39,13 @@ jobs:
       - name: Deploy
         id: deployment
         uses: actions/deploy-pages@v4
+        continue-on-error: true
+      # Pages devuelve a veces "Deployment failed, try again later";
+      # un segundo intento tras una pausa suele bastar
+      - name: Espera antes del reintento
+        if: steps.deployment.outcome == 'failure'
+        run: sleep 45
+      - name: Reintento del deploy
+        id: retry
+        if: steps.deployment.outcome == 'failure'
+        uses: actions/deploy-pages@v4
