@@ -22,10 +22,12 @@ function scatter(rand: () => number, cx: number, cy: number, sdx: number, sdy: n
 /** Blobs redondos y separados: el caso fácil, todas las variantes coinciden. */
 export function blobs(seed = 1, n = 150): Point[] {
   const rand = mulberry32(seed);
+  // los centros varían con la semilla: "otra muestra" cambia la configuración
+  const jit = () => (rand() - 0.5) * 0.16;
   const centers = [
-    { x: 0.25, y: 0.3 },
-    { x: 0.72, y: 0.25 },
-    { x: 0.5, y: 0.75 },
+    { x: 0.25 + jit(), y: 0.3 + jit() },
+    { x: 0.73 + jit(), y: 0.27 + jit() },
+    { x: 0.5 + jit(), y: 0.74 + jit() },
   ];
   return Array.from({ length: n }, (_, i) => {
     const c = centers[i % centers.length]!;
@@ -36,12 +38,14 @@ export function blobs(seed = 1, n = 150): Point[] {
 /** Blobs estirados y rotados (anisotrópicos). */
 export function anisotropic(seed = 2, n = 150): Point[] {
   const rand = mulberry32(seed);
+  const jit = () => (rand() - 0.5) * 0.1;
   const centers = [
-    { x: 0.3, y: 0.28 },
-    { x: 0.62, y: 0.52 },
-    { x: 0.35, y: 0.78 },
+    { x: 0.3 + jit(), y: 0.28 + jit() },
+    { x: 0.62 + jit(), y: 0.52 + jit() },
+    { x: 0.35 + jit(), y: 0.78 + jit() },
   ];
-  const angle = (35 * Math.PI) / 180;
+  // la orientación también cambia con la semilla
+  const angle = ((20 + rand() * 30) * Math.PI) / 180;
   const cos = Math.cos(angle);
   const sin = Math.sin(angle);
   return Array.from({ length: n }, (_, i) => {
@@ -50,6 +54,44 @@ export function anisotropic(seed = 2, n = 150): Point[] {
     const gy = gauss(rand) * 0.028;
     return { x: clamp01(c.x + gx * cos - gy * sin), y: clamp01(c.y + gx * sin + gy * cos) };
   });
+}
+
+/**
+ * Tres grupos que se solapan: las fronteras son ambiguas y muchos puntos
+ * podrían pertenecer a varios clústeres (el terreno natural de Fuzzy).
+ */
+export function overlapping(seed = 5, n = 160): Point[] {
+  const rand = mulberry32(seed);
+  const jit = () => (rand() - 0.5) * 0.08;
+  const centers = [
+    { x: 0.36 + jit(), y: 0.4 + jit() },
+    { x: 0.63 + jit(), y: 0.42 + jit() },
+    { x: 0.5 + jit(), y: 0.66 + jit() },
+  ];
+  return Array.from({ length: n }, (_, i) => {
+    const c = centers[i % centers.length]!;
+    return scatter(rand, c.x, c.y, 0.1, 0.11);
+  });
+}
+
+/**
+ * Dos anillos concéntricos: junto a las lunas, el otro recordatorio clásico de
+ * que K-Means solo encuentra grupos convexos alrededor de un centro.
+ */
+export function rings(seed = 6, n = 160): Point[] {
+  const rand = mulberry32(seed);
+  const points: Point[] = [];
+  const half = Math.floor(n / 2);
+  for (let i = 0; i < n; i++) {
+    const angle = rand() * Math.PI * 2;
+    const radius = (i < half ? 0.13 : 0.36) + gauss(rand) * 0.022;
+    // el radio horizontal se comprime para que el lienzo 3:2 los muestre redondos
+    points.push({
+      x: clamp01(0.5 + Math.cos(angle) * radius * 0.72),
+      y: clamp01(0.5 + Math.sin(angle) * radius * 1.08),
+    });
+  }
+  return points;
 }
 
 /** Un grupo enorme y disperso y dos pequeños y densos. */

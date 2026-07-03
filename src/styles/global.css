@@ -386,15 +386,18 @@ input[type='range'] {
     order: -1;
   }
 
-  /* el selector de datos ocupa el ancho y el resto de campos se alinean */
+  /* el selector de datos pasa a rejilla: 6 formas en dos filas de tres */
   .toolbar .seg {
-    display: flex;
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
     flex: 1 1 100%;
+    border-width: 0 1px 1px 0;
   }
 
   .toolbar .seg-btn {
-    flex: 1;
     padding-inline: 8px;
+    border-left: 1px solid var(--line);
+    border-top: 1px solid var(--line);
   }
 
   .toolbar .field {

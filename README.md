@@ -12,8 +12,9 @@ compruebas con tus propias manos.
 
 ## Estado
 
-Recorrido completo funcionando en local (hitos M0–M4: apertura, sandbox base,
-las cinco salas, arena comparativa y guía de decisión). Pendiente el despliegue
+Recorrido completo funcionando en local (hitos M0–M4: apertura, la esencia con
+diagrama del ciclo, las cinco salas con línea de tiempo y narración, y la guía
+de decisión con la tabla comparativa del temario). Pendiente el despliegue
 público (M5). Ver el plan en [`docs/ROADMAP.md`](docs/ROADMAP.md).
 
 Los cinco algoritmos pasan las comprobaciones de fidelidad de

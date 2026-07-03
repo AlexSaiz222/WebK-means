@@ -4,8 +4,9 @@ Este documento describe el recorrido de la página y, para cada parte, qué se
 muestra y qué se puede tocar. Es el guion. La teoría exacta de cada algoritmo
 está en `ALGORITMOS.md`; aquí nos centramos en la experiencia.
 
-El recorrido es una sola página con scroll vertical. Cada sección ocupa
-idealmente una pantalla y encadena con la siguiente sin costuras.
+El recorrido es una sola página con scroll vertical y un menú lateral fijo
+(con scroll-spy) para saltar entre secciones. Cada sección ocupa idealmente
+una pantalla y encadena con la siguiente sin costuras.
 
 ---
 
@@ -14,117 +15,110 @@ idealmente una pantalla y encadena con la siguiente sin costuras.
 **Objetivo:** enganchar en tres segundos y dar el tono (calma, cuidado, curiosidad).
 
 - Portada limpísima, mucho espacio en blanco.
-- Una única animación de fondo, discreta: unos puntos que se agrupan solos en
-  bucle lento.
-- Titular: *"Un algoritmo, cinco personalidades."*
-- Subtítulo con la pregunta que vertebra la página.
-- Un indicador sutil de "desliza para empezar". Nada más.
+- Una única animación de fondo, discreta: puntos que viajan hasta agruparse,
+  se dispersan y se reagrupan en bucle lento, esquivando la columna del texto.
+- Titular: *"Un algoritmo, cinco personalidades."* (la palabra "cinco" lleva
+  los colores de los clústeres).
+- Subtítulo con la pregunta que vertebra la página y un indicador sutil de
+  "desliza para empezar". Nada más.
 
-## 1. El fundamento común
+## 1. La esencia de K-Means
 
-**Objetivo:** asentar el vocabulario (centroide, asignación, convergencia) antes
-de hablar de variantes.
+**Objetivo:** asentar el contexto y el vocabulario (aprendizaje no supervisado,
+centroide, asignación, actualización, convergencia, sensibilidad a la
+inicialización) antes de hablar de variantes.
 
-- Un primer sandbox con el K-Means base.
-- El visitante puede: colocar/mover puntos con el ratón, elegir el número de
-  grupos `k`, y pulsar **"paso a paso"** para ver un ciclo completo
-  asignar → recalcular, o **"reproducir"** para verlo converger solo.
-- Un texto corto nombra cada elemento la primera vez que aparece en pantalla.
-- Al final, la idea que abre el resto: "este ciclo básico admite cinco formas
-  distintas de ejecutarse. Vamos a verlas."
+- Texto editorial con el contexto del temario y un **diagrama estático de tres
+  paneles** que muestra una vuelta del ciclo: inicialización (puntos grises,
+  centroides arbitrarios), asignación (colores + líneas al centroide más
+  cercano) y actualización (los centroides se desplazan a la media, con la
+  posición anterior en claro).
+- El diagrama está **calculado de verdad** (asignaciones y medias reales), no
+  dibujado a ojo.
+- Sin laboratorio aquí: el primer lab interactivo es la sala de Lloyd, y el
+  texto lo anuncia.
 
 ## 2. Las cinco salas
 
-El núcleo. Una sección por variante, cada una diseñada para **aislar exactamente
-la diferencia** que la define. No repiten la misma demo con otro nombre: cada
-sala tiene una interacción pensada para su idea.
+El núcleo. Una sección por variante. Todas comparten el mismo instrumento
+(panel con selector de muestras, k ajustable, línea de tiempo con reproducir /
+flechas / barra arrastrable, recuadro de narración por fase y métricas), y cada
+una añade la interacción que aísla su diferencia:
 
-### 2.1 Lloyd — el ritmo por lotes
-- Se visualiza el ciclo en dos tiempos marcados: primero **todos** los puntos se
-  reasignan a la vez, y solo entonces los centroides "saltan" a su nueva media.
-- Control para avanzar tiempo a tiempo y notar el movimiento en bloque.
-- Mensaje: es el más simple; la base de todo lo demás.
+### 2.1 Lloyd: actualización por lotes
+- La ejecución se recorre por **fases**: reasignación en bloque (los puntos que
+  cambian de clúster quedan marcados con un aro) y actualización de centroides.
+- Los centroides arrancan en posiciones aleatorias para que el recorrido hasta
+  converger sea visible; se pueden **arrastrar puntos y centroides** y la
+  ejecución se recalcula desde esa configuración.
+- Mensaje: la formulación clásica; la referencia del resto.
 
-### 2.2 MacQueen — el modo online
-- El visitante suelta puntos **uno a uno** y ve el centroide afectado desplazarse
-  al instante con cada punto (media incremental).
-- **Detalle estrella:** un botón "barajar orden" que reordena los datos y
-  demuestra que MacQueen puede converger a algo distinto según el orden de
-  llegada — algo que a Lloyd no le pasa. Se puede mostrar Lloyd y MacQueen sobre
-  los mismos datos para contrastar.
+### 2.2 MacQueen: K-Means secuencial
+- Reproducción **punto a punto**: se ve cada asignación individual y el
+  centroide afectado desplazándose al instante (media incremental).
+- **Detalle estrella:** el conmutador "barajar orden" rehace la ejecución con
+  los mismos datos y la misma inicialización en otro orden, y el veredicto
+  ("mismo resultado / resultado distinto") evidencia la sensibilidad al orden,
+  que Lloyd no tiene.
 - Mensaje: ideal para datos que llegan en flujo continuo.
 
-### 2.3 Hartigan-Wong — la pregunta inteligente
-- Al pasar el ratón sobre un punto, la interfaz muestra si moverlo a otro grupo
-  **reduce o no** la función objetivo (SSE total), y solo lo mueve si mejora.
-- Se puede resaltar un punto "frontera" y ver el cálculo de ganancia/coste que
-  decide su destino.
-- Mensaje: al no limitarse al centroide más cercano, escapa mejor de malos
+### 2.3 Hartigan-Wong: reasignación por mejora de la inercia
+- Al señalar un punto, la interfaz muestra la **ganancia por salir** de su
+  clúster frente al **coste de entrar** en el mejor candidato (líneas continua
+  y discontinua), y el veredicto: se queda o se trasladaría.
+- Mensaje: al no limitarse al centroide más cercano, escapa mejor de los
   mínimos locales.
 
-### 2.4 Elkan — el ahorro invisible
-- Como da **el mismo resultado** que Lloyd, su historia no está en los grupos
-  sino en la eficiencia. Dos contadores en paralelo (Lloyd vs. Elkan) muestran
-  cuántos cálculos de distancia lleva hecho cada uno; Elkan se queda muy por
-  debajo.
-- Una pequeña ilustración geométrica de la **desigualdad triangular** explica
-  *por qué* puede descartar un centroide sin medir la distancia.
-- Mensaje: misma respuesta, mucho menos trabajo — brilla en datos grandes.
-- Este es el momento "ajá" del proyecto; cuídalo.
+### 2.4 Elkan: aceleración por la desigualdad triangular
+- Como da **el mismo resultado** que Lloyd, su historia está en la eficiencia:
+  dos lienzos en paralelo (Lloyd / Elkan) con contadores de distancias y el
+  porcentaje de ahorro en vivo, más la comprobación "mismas etiquetas".
+- Una ilustración geométrica de la **desigualdad triangular** explica por qué
+  puede descartar un centroide sin medir la distancia.
+- Mensaje: misma respuesta, mucho menos trabajo; brilla en datos grandes.
 
-### 2.5 Fuzzy / Soft — la duda
-- Aquí los puntos no tienen color sólido: llevan una **mezcla** según su
-  pertenencia a cada grupo.
-- Un deslizador para el parámetro de borrosidad `m` deja ver cómo las fronteras
-  se endurecen (hacia K-Means clásico) o se difuminan.
-- Se pueden señalar puntos que son "70 % de un grupo y 30 % de otro" y ver sus
-  porcentajes.
-- Mensaje: útil cuando los límites entre grupos no están claros (segmentación de
-  imágenes, diagnóstico médico...).
+### 2.5 Fuzzy C-Means: pertenencias graduales
+- Los puntos no tienen color sólido: llevan la **mezcla** de sus pertenencias.
+- Deslizador para la borrosidad `m` (endurece hacia el K-Means clásico o
+  difumina las fronteras) y lectura de porcentajes al señalar un punto.
+- Arranca sobre la muestra de grupos **solapados**, su terreno natural.
+- Mensaje: útil cuando los límites entre grupos no están claros.
 
-## 3. La arena comparativa
+## 3. Guía de decisión
 
-**Objetivo:** el clímax. Ver las cinco a la vez, en igualdad de condiciones.
+**Objetivo:** convertir lo explorado en una conclusión útil.
 
-- El **mismo** conjunto de datos, las cinco variantes corriendo en paralelo en
-  una rejilla, convergiendo a la vez.
-- Un panel de métricas vivo por variante: iteraciones, cálculos de distancia,
-  calidad del agrupamiento (p. ej. silueta o SSE).
-- El visitante cambia la **forma de los datos** con un selector: redondos,
-  alargados/anisotrópicos, densidades muy desiguales, y las clásicas "lunas".
-  Así ve de un vistazo dónde cada algoritmo brilla o se rompe.
-- Botón de "misma semilla" para comparar de forma justa y otro para "rebarajar".
+- **Tabla comparativa** basada en el resumen del Tema 3: variante,
+  actualización de centroides, fortaleza, a cambio, y cuándo elegirla.
+- Cada variante enlaza de vuelta a su sala.
 
-## 4. La guía de decisión
+> Nota: la "arena comparativa" (las cinco variantes corriendo en paralelo) se
+> construyó y después se retiró por decisión de producto; la comparación vive
+> ahora en esta tabla y en la sala de Elkan (única comparación en paralelo).
 
-**Objetivo:** convertir lo explorado en una conclusión útil. Tu valor añadido.
+## 4. Cierre
 
-- Un resumen interactivo tipo "si tus datos son X → usa Y, porque Z".
-- Puede ser un pequeño árbol o unas tarjetas: el visitante indica su situación
-  (tamaño de datos, si llegan en flujo, si las fronteras son difusas, si el
-  dataset es grande) y la guía recomienda la variante y explica el porqué,
-  enlazando de vuelta a la sala correspondiente.
-
-## 5. Cierre
-
-- Créditos discretos, enlace al repositorio, y una línea sobre la asignatura /
-  contexto. Nada recargado.
+- Créditos discretos y una línea sobre la asignatura / contexto. Nada recargado.
 
 ---
 
-## Datasets que deben existir
+## Muestras de datos
 
-Definidos en `src/lib/data/`. Elegidos para que las variantes **discrepen**:
+Definidas en `src/lib/data/datasets.ts`, elegidas para que las variantes
+**discrepen**. Todas disponibles en el selector de cada sala, con "otra
+muestra" para regenerar (los generadores varían centros y orientación con la
+semilla):
 
-- **blobs** redondos y separados (caso fácil, todas coinciden).
-- **anisotrópico** (blobs estirados y rotados).
-- **densidades desiguales** (un grupo enorme y otros pequeños).
-- **lunas** (dos medias lunas entrelazadas: K-Means falla, buen recordatorio de
-  sus límites).
+- **redondos**: blobs separados (caso fácil, todas coinciden).
+- **solapados**: tres grupos que se mezclan (fronteras ambiguas; Fuzzy brilla).
+- **alargados**: blobs estirados y rotados (anisotrópicos).
+- **desiguales**: un grupo enorme y disperso y dos pequeños y densos.
+- **lunas**: dos medias lunas entrelazadas (K-Means falla).
+- **anillos**: dos círculos concéntricos (el otro fallo clásico: solo grupos
+  convexos).
 
-## Caso real opcional como hilo (recomendado si da tiempo)
+## Caso real opcional como hilo (si da tiempo)
 
 La **compresión de imagen** es la aplicación más vistosa del temario: se ve
-literalmente cómo cada variante reduce una foto a `N` colores. Puede vivir como
-una sección extra tras la arena comparativa, o como "modo avanzado". No es
-imprescindible para la primera versión, pero da una narrativa con final.
+literalmente cómo cada variante reduce una foto a `N` colores. La sala de
+Elkan ya la menciona como contexto; una demo interactiva queda como extra.

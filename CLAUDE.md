@@ -80,8 +80,10 @@ src/
   layouts/
     Base.astro           # <head>, fuentes, estilos globales
   components/
-    sections/            # una .astro por "sala" del recorrido
-    ui/                  # controles reutilizables (sliders, botones, contadores)
+    Nav.astro            # menú lateral fijo con scroll-spy
+    sections/            # una .astro por sección: Apertura, Fundamento (diagrama),
+                         # SalaLloyd, SalaMacQueen, SalaHartigan, SalaElkan,
+                         # SalaFuzzy y Guia (tabla comparativa)
   lib/                   # TypeScript puro, sin nada de Astro ni de DOM (salvo sim/)
     algorithms/          # UNA implementación por variante, sin dependencias de UI
       types.ts           # interfaz común (ver abajo)
@@ -91,10 +93,10 @@ src/
       hartigan-wong.ts
       elkan.ts
       fuzzy.ts
-    sim/                 # motor de simulación y render sobre canvas
-      engine.ts          # bucle paso-a-paso, control de reproducción
-      renderer.ts        # dibuja puntos, centroides, transiciones
-    data/                # generadores de datasets (blobs, lunas, densidades)
+    sim/
+      renderer.ts        # dibuja puntos, centroides y transiciones sobre canvas
+    data/                # generadores de datasets (redondos, solapados, alargados,
+                         # desiguales, lunas, anillos)
   styles/                # tokens de diseño y hoja global
 astro.config.mjs
 ```
@@ -103,14 +105,17 @@ astro.config.mjs
 
 Cada variante vive en `src/lib/algorithms/` **sin saber nada del canvas ni del
 DOM**. Expone su estado paso a paso (centroides, asignaciones, métricas)
-mediante una interfaz común, y la capa `src/lib/sim/` se encarga de dibujarlo.
-Los componentes `.astro` solo montan el DOM y conectan controles con el motor.
-Esto permite:
+mediante una interfaz común, y `src/lib/sim/renderer.ts` se encarga de
+dibujarlo. Cada sala precalcula la ejecución completa como un **historial de
+fotogramas** (snapshots de etiquetas, centroides y métricas) y una línea de
+tiempo lo recorre: reproducir, avanzar/retroceder con flechas, o arrastrar la
+barra. Arrastrar un centroide o un punto ramifica: se recalcula la ejecución
+desde esa configuración. Esto permite:
 
-- correr las cinco variantes en paralelo en la sección comparativa reutilizando
-  el mismo motor,
-- animar "paso a paso" (una iteración por clic) o "reproducir" (auto),
-- y probar la lógica de forma aislada.
+- repasar cualquier momento de la ejecución hacia atrás y hacia delante,
+- narrar cada fase con datos reales del fotograma (recuadro de narración),
+- y probar la lógica de forma aislada (`npm test` ejecuta las comprobaciones
+  de fidelidad de `docs/ALGORITMOS.md` con Node).
 
 Interfaz común orientativa (defínela bien en `src/lib/algorithms/types.ts`):
 

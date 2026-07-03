@@ -8,7 +8,7 @@ import { MacQueen } from '../src/lib/algorithms/macqueen.ts';
 import { HartiganWong } from '../src/lib/algorithms/hartigan-wong.ts';
 import { Elkan } from '../src/lib/algorithms/elkan.ts';
 import { Fuzzy } from '../src/lib/algorithms/fuzzy.ts';
-import { blobs, anisotropic, unevenDensities, moons } from '../src/lib/data/datasets.ts';
+import { blobs, anisotropic, unevenDensities, moons, overlapping, rings } from '../src/lib/data/datasets.ts';
 
 let failures = 0;
 
@@ -35,6 +35,8 @@ const datasets: Array<[string, Point[]]> = [
   ['anisotrópico', anisotropic(12, 200)],
   ['densidades', unevenDensities(13, 200)],
   ['lunas', moons(14, 200)],
+  ['solapados', overlapping(15, 200)],
+  ['anillos', rings(16, 200)],
 ];
 
 // ---- 1. Elkan == Lloyd (mismas etiquetas, muchos menos cálculos) ----

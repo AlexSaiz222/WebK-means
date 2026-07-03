@@ -35,9 +35,11 @@
       <div class="controls toolbar">
         <div class="seg" role="group" aria-label="forma de los datos">
           <button class="seg-btn" data-shape="redondos" aria-pressed="false">redondos</button>
+          <button class="seg-btn" data-shape="solapados" aria-pressed="false">solapados</button>
           <button class="seg-btn" data-shape="alargados" aria-pressed="true">alargados</button>
           <button class="seg-btn" data-shape="desiguales" aria-pressed="false">desiguales</button>
           <button class="seg-btn" data-shape="lunas" aria-pressed="false">lunas</button>
+          <button class="seg-btn" data-shape="anillos" aria-pressed="false">anillos</button>
         </div>
         <button class="btn" data-action="regen">otra muestra</button>
         <label class="field">
@@ -95,7 +97,7 @@
   import { HartiganWong } from '../../lib/algorithms/hartigan-wong.ts';
   import { inertia } from '../../lib/algorithms/kmeans-base.ts';
   import type { Point } from '../../lib/algorithms/types.ts';
-  import { blobs, anisotropic, unevenDensities, moons } from '../../lib/data/datasets.ts';
+  import { blobs, anisotropic, unevenDensities, moons, overlapping, rings } from '../../lib/data/datasets.ts';
   import { CanvasRenderer } from '../../lib/sim/renderer.ts';
 
   const root = document.getElementById('sala-hartigan')!;
@@ -108,9 +110,11 @@
 
   const SHAPES: Record<string, (seed: number, n: number) => Point[]> = {
     redondos: blobs,
+    solapados: overlapping,
     alargados: anisotropic,
     desiguales: unevenDensities,
     lunas: moons,
+    anillos: rings,
   };
 
   const seed = 12;

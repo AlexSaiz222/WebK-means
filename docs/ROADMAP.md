@@ -56,11 +56,11 @@ MacQueen).
 **Hecho cuando:** las cinco salas funcionan y cada una demuestra su diferencia
 característica de forma fiel.
 
-## M3 — Arena comparativa (sección 3) · HECHO (2026-07-02)
+## M3 — Arena comparativa (sección 3) · HECHO Y RETIRADO
 
-> Verificada en navegador: misma semilla reproduce el resultado exacto; Elkan
-> iguala el SSE de Lloyd con menos de la mitad de distancias; MacQueen converge
-> en menos iteraciones; en las lunas todas fallan por igual (SSE ~7.45).
+> Se construyó y verificó (2026-07-02) y se retiró después (2026-07-03) por
+> decisión de producto: la comparación entre variantes vive ahora en la tabla
+> de la guía de decisión y en la sala de Elkan (Lloyd y Elkan en paralelo).
 
 - Ejecutar las cinco variantes en paralelo sobre el mismo dataset y semilla.
 - Panel de métricas vivo (iteraciones, cálculos de distancia, calidad).
@@ -73,9 +73,12 @@ cambiar la forma de los datos.
 ## M4 — Guía de decisión + apertura + pulido (secciones 0, 4, 5) · HECHO (2026-07-02)
 
 > Apertura con animación en bucle (se pausa fuera de pantalla y con
-> `prefers-reduced-motion`), guía de decisión con las cinco situaciones
-> enlazando a su sala, cierre, y repaso móvil (390 px sin desbordamiento).
-> El tema oscuro queda como extra opcional.
+> `prefers-reduced-motion`), guía de decisión (ahora tabla comparativa del
+> temario con enlaces a cada sala), cierre, y repaso móvil (390 px sin
+> desbordamiento). Después se añadieron: menú lateral con scroll-spy, línea de
+> tiempo con fases y narración en todas las salas, arrastre de centroides con
+> ramificación, seis muestras de datos y una pasada de lenguaje fiel al
+> temario. El tema oscuro queda como extra opcional.
 
 - Sección de apertura con la animación en bucle y el titular.
 - Guía de decisión interactiva ("si tus datos son X → usa Y, porque Z").
