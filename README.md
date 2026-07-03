@@ -97,6 +97,10 @@ Supervisado*. Los apuntes originales de la asignatura no se distribuyen en
 este repositorio; [`docs/ALGORITMOS.md`](docs/ALGORITMOS.md) recoge toda la
 teoría necesaria.
 
-## Créditos
+## Créditos y licencia
 
-Diseño e implementación: Alejandro.
+Diseño e implementación: **Alejandro Manuel Saiz García** —
+[GitHub](https://github.com/AlexSaiz222) ·
+[LinkedIn](https://www.linkedin.com/in/alejandrosaizgarc%C3%ADa)
+
+Código bajo licencia [MIT](LICENSE).
