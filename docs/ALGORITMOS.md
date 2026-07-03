@@ -1,10 +1,10 @@
-# Referencia de algoritmos (fiel al Tema 3)
+# Referencia de algoritmos
 
 **Fuente de verdad del proyecto.** Cada simulación debe comportarse como se
 describe aquí. Si una implementación "queda bonita" pero contradice esta
-referencia, la implementación está mal. Basado en el Tema 3 de la asignatura
-*Aprendizaje Automático No Supervisado* (UNIR); el temario original está en
-`docs/Tema3.pdf` por si surge una duda que este documento no resuelva.
+referencia, la implementación está mal. Es el destilado de los apuntes de la
+asignatura *Aprendizaje Automático No Supervisado* (UNIR); los apuntes
+originales no se distribuyen en este repositorio por derechos de autor.
 
 Notación:
 - `X` = conjunto de puntos, cada `x` un vector.
@@ -29,9 +29,9 @@ Ciclo genérico del que parten todas las variantes:
 3. Termina cuando los centroides dejan de moverse por encima de una tolerancia.
 
 **Inicialización:** usa **k-means++** compartido para todas las variantes duras,
-salvo donde el temario indique otra cosa (Hartigan-Wong, ver su apartado). Una
+salvo donde los apuntes indiquen otra cosa (Hartigan-Wong, ver su apartado). Una
 buena inicialización reduce el riesgo de caer en malos mínimos locales — un
-problema que el temario señala como el gran talón de Aquiles del K-Means.
+problema que los apuntes señalan como el gran talón de Aquiles del K-Means.
 
 **Para el proyecto:** la inicialización debe ser reproducible con una semilla,
 para poder comparar variantes en igualdad de condiciones en la arena.
@@ -96,11 +96,11 @@ Va un paso más allá de "asignar al más cercano": reasigna un punto a otro gru
 **solo si eso reduce la función objetivo**, mejorando la calidad global del
 agrupamiento.
 
-Tal como lo describe el temario:
+Tal como lo describen los apuntes:
 - Inicialización: se asignan los puntos a los centroides **de forma aleatoria** y
   luego cada centroide se calcula como la **media** de sus puntos asignados. Esto
-  deja los centroides inicialmente en posiciones parecidas, lo que —según el
-  temario— reduce la probabilidad de converger a un mínimo local.
+  deja los centroides inicialmente en posiciones parecidas, lo que —según los
+  apuntes— reduce la probabilidad de converger a un mínimo local.
 - En consecuencia, un punto puede acabar asignado a un centroide que **no es el
   más cercano**, si con ello disminuye la función objetivo.
 - Se repite hasta convergencia o máximo de iteraciones.
@@ -134,7 +134,7 @@ Variante pensada para **acelerar** el K-Means reduciendo el número de cálculos
 distancia. **Produce exactamente el mismo resultado que Lloyd**; su ventaja está
 en la eficiencia, no en el agrupamiento.
 
-Principios (del temario):
+Principios (de los apuntes):
 - **Reducción de cálculos** mediante **límites superior e inferior** de las
   distancias de cada punto a los centroides. Si sabemos que un punto está cerca
   de un centroide, podemos evitar medir su distancia a centroides lejanos.
@@ -198,7 +198,7 @@ e **interpretabilidad** más rica. Desventajas: computacionalmente **más costos
 (calcula el grado de pertenencia a cada grupo) y elegir bien `k` y las funciones
 de pertenencia es difícil.
 
-Aplicaciones que cita el temario: segmentación de imágenes, marketing,
+Aplicaciones que citan los apuntes: segmentación de imágenes, marketing,
 diagnóstico médico, monitoreo ambiental, análisis de tráfico, evaluación de
 riesgo.
 
@@ -218,6 +218,31 @@ y la posibilidad de inspeccionar los porcentajes de un punto concreto.
 | Elkan           | Por lotes (= Lloyd)         | Muchos menos cálculos de distancia          | Datasets grandes donde el coste importa           |
 | Fuzzy / Soft    | Ponderado por pertenencia   | Fronteras difusas, robustez al ruido        | Cuando los límites entre grupos no están claros   |
 
+## Elección del número de clústeres (sección "¿Y cómo se elige k?")
+
+Tres métodos clásicos; los dos primeros tienen laboratorio, la brecha solo se
+menciona en el texto.
+
+- **Método del codo:** trazar la inercia frente a `k`. La inercia siempre
+  disminuye al aumentar `k`, así que su mínimo no sirve de criterio; se busca
+  el punto donde la caída **se desacelera** y la curva forma un codo. Rápido
+  pero subjetivo en datos complejos. (En el lab, el codo sugerido se estima con
+  la mayor segunda diferencia de la curva; es orientativo y así se narra.)
+- **Coeficiente de la silueta**, en su versión simplificada por centros: para
+  cada punto, `a` = distancia al centro de su grupo y `b` = distancia al
+  segundo mejor centro (el más cercano que no es el suyo);
+  `s = (b − a) / max(a, b)`. Cerca de 1 = bien agrupado; cerca de 0 = en la
+  frontera; negativo = probablemente en el grupo equivocado. El `k` óptimo
+  maximiza la silueta media. No está definida con `k = 1`.
+- **Estadística de brecha:** comparar la inercia de los datos reales con la
+  esperada en datos aleatorios sin estructura; el `k` óptimo maximiza esa
+  diferencia. Sin lab: requiere bootstrap (varios conjuntos de referencia) y
+  aporta poco sobre los otros dos en 2D.
+
+Cada punto de las curvas debe ser una ejecución completa de Lloyd hasta
+convergencia, con varias semillas y quedándose con la mejor (el `n_init` de la
+práctica), para que un mal mínimo local no deforme la curva.
+
 ## Comprobaciones de fidelidad (úsalas como tests)
 
 - **Elkan == Lloyd:** con la misma semilla y datos, las etiquetas finales de
@@ -229,3 +254,6 @@ y la posibilidad de inspeccionar los porcentajes de un punto concreto.
   difusas); con `m → 1⁺` se acercan a una asignación dura.
 - **Todas** deben reducir (o mantener) la función objetivo iteración a iteración;
   nunca empeorarla de forma sostenida.
+- **Elección de k:** la inercia (mejor de varias semillas) no crece con `k`;
+  la silueta media queda en `[-1, 1]` y no está definida con `k = 1`; con tres
+  blobs separados, la silueta elige `k = 3`.

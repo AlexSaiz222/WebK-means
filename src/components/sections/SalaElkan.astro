@@ -93,6 +93,10 @@
           <dt>estado</dt>
           <dd data-out="status">listo</dd>
         </div>
+        <div class="metric metric-spark">
+          <dt>evolución de la inercia</dt>
+          <dd><canvas class="spark" data-spark aria-label="Curva de la inercia a lo largo de la ejecución, con un marcador en el paso actual"></canvas></dd>
+        </div>
       </dl>
     </div>
   </div>
@@ -175,6 +179,7 @@
   import type { Point } from '../../lib/algorithms/types.ts';
   import { blobs, anisotropic, unevenDensities, moons, overlapping, rings } from '../../lib/data/datasets.ts';
   import { CanvasRenderer } from '../../lib/sim/renderer.ts';
+  import { drawSparkline } from '../../lib/sim/sparkline.ts';
 
   const root = document.getElementById('sala-elkan')!;
   const out = (n: string) => root.querySelector<HTMLElement>(`[data-out="${n}"]`)!;
@@ -204,10 +209,17 @@
   const cElkan = root.querySelector<HTMLCanvasElement>('[data-canvas="elkan"]')!;
   const rLloyd = new CanvasRenderer(cLloyd);
   const rElkan = new CanvasRenderer(cElkan);
-  const accent =
-    getComputedStyle(cLloyd).getPropertyValue('--accent').trim() || '#2D5BFF';
+  const cs = getComputedStyle(cLloyd);
+  const accent = cs.getPropertyValue('--accent').trim() || '#2D5BFF';
+  const inkSoft = cs.getPropertyValue('--ink-soft').trim() || '#6B6B6B';
 
   const fmt = new Intl.NumberFormat('es-ES');
+
+  const sparkCanvas = root.querySelector<HTMLCanvasElement>('[data-spark]')!;
+
+  function updateSpark() {
+    drawSparkline(sparkCanvas, history.map((f) => f.inertiaVal), pos, { accent, soft: inkSoft });
+  }
 
   // ---- historial ----
   interface HistoryFrame {
@@ -309,6 +321,7 @@
     btn('play').disabled = atEnd;
     btn('step').disabled = atEnd;
     btn('back').disabled = pos === 0;
+    updateSpark();
   }
 
   function forward(animate = true): boolean {
@@ -538,10 +551,9 @@
   setupEvents(cElkan, rElkan);
 
   root.addEventListener('contentvisibilityautostatechange', (ev) => {
-    if ((ev as ContentVisibilityAutoStateChangeEvent).skipped) {
-      stopPlay();
-      display();
-    }
+    if ((ev as ContentVisibilityAutoStateChangeEvent).skipped) stopPlay();
+    // al volver a ser visible se repinta (el sparkline necesita medidas reales)
+    display(false);
   });
 
   // gancho para verificación

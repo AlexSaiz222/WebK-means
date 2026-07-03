@@ -73,12 +73,15 @@ cambiar la forma de los datos.
 ## M4 — Guía de decisión + apertura + pulido (secciones 0, 4, 5) · HECHO (2026-07-02)
 
 > Apertura con animación en bucle (se pausa fuera de pantalla y con
-> `prefers-reduced-motion`), guía de decisión (ahora tabla comparativa del
-> temario con enlaces a cada sala), cierre, y repaso móvil (390 px sin
-> desbordamiento). Después se añadieron: menú lateral con scroll-spy, línea de
-> tiempo con fases y narración en todas las salas, arrastre de centroides con
-> ramificación, seis muestras de datos y una pasada de lenguaje fiel al
-> temario. El tema oscuro queda como extra opcional.
+> `prefers-reduced-motion`), guía de decisión (ahora tabla comparativa con
+> enlaces a cada sala), cierre, y repaso móvil (390 px sin desbordamiento).
+> Después se añadieron: menú lateral con scroll-spy, línea de tiempo con fases
+> y narración en todas las salas, arrastre de centroides con ramificación,
+> seis muestras de datos y una pasada de lenguaje fiel a `ALGORITMOS.md`.
+> También (2026-07-03): fronteras de Voronoi en Lloyd (toggle en el lienzo),
+> curva de inercia en las métricas de las cinco salas, y la sección
+> "¿Y cómo se elige k?" (codo + silueta con previo interactivo).
+> El tema oscuro queda como extra opcional.
 
 - Sección de apertura con la animación en bucle y el titular.
 - Guía de decisión interactiva ("si tus datos son X → usa Y, porque Z").

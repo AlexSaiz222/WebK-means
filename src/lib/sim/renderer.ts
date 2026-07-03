@@ -56,6 +56,7 @@ export class CanvasRenderer {
   private colorsRgb: Rgb[] = FALLBACK_COLORS.map(hexToRgb);
   private neutral = '#6B6B6B';
   private overlay: OverlayFn | null = null;
+  private underlay: OverlayFn | null = null;
   private readonly reducedMotion = matchMedia('(prefers-reduced-motion: reduce)').matches;
 
   constructor(private readonly canvas: HTMLCanvasElement) {
@@ -167,6 +168,10 @@ export class CanvasRenderer {
     ctx.clearRect(0, 0, this.w, this.h);
     if (!this.state) return;
 
+    // dibujo bajo los puntos (p. ej. celdas de Voronoi); recibe los centroides
+    // tal y como se muestran para seguir la animación
+    if (this.underlay) this.underlay(ctx, { x: (v) => this.toX(v), y: (v) => this.toY(v) });
+
     ctx.globalAlpha = 0.85;
     for (let i = 0; i < this.state.points.length; i++) {
       const p = this.state.points[i]!;
@@ -202,6 +207,17 @@ export class CanvasRenderer {
   setOverlay(fn: OverlayFn | null): void {
     this.overlay = fn;
     this.paint();
+  }
+
+  /** Dibujo bajo los puntos (fondos: celdas de Voronoi). */
+  setUnderlay(fn: OverlayFn | null): void {
+    this.underlay = fn;
+    this.paint();
+  }
+
+  /** Centroides tal y como se muestran ahora mismo (siguen la animación). */
+  get shownCentroids(): readonly Point[] {
+    return this.shown;
   }
 
   destroy(): void {

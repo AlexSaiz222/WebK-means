@@ -6,8 +6,8 @@ import { MAX_ITER, mulberry32, inertia, sqDist } from './kmeans-base.ts';
  * Inercia, teniendo en cuenta que mover el punto desplaza ambos
  * centroides. Un punto puede acabar en un centroide que no es el más cercano.
  *
- * Inicialización según el temario: asignación aleatoria de puntos a clústeres
- * y centroides como media de los asignados (quedan inicialmente parecidos).
+ * Inicialización según docs/ALGORITMOS.md: asignación aleatoria de puntos a
+ * clústeres y centroides como media de los asignados (quedan parecidos).
  */
 export class HartiganWong implements Clusterer {
   readonly name: string = 'Hartigan-Wong';

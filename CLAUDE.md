@@ -41,9 +41,12 @@ La página entera es la respuesta, respondida interactuando.
   **Léelo antes de tocar estilos.**
 - `docs/ROADMAP.md` — el plan por hitos. Construimos en este orden, un hito
   cerrado y funcionando antes de pasar al siguiente.
-- `docs/Tema3.pdf` — el temario original de la asignatura. `ALGORITMOS.md` es
-  su destilado y la referencia de trabajo; el PDF queda como fuente última si
-  surge una duda que el `.md` no resuelve.
+- `docs/Tema*.pdf` — los apuntes originales de la asignatura (solo en local:
+  están en `.gitignore` y **no se distribuyen** por derechos de autor).
+  `ALGORITMOS.md` es su destilado y la referencia de trabajo; los PDF quedan
+  como fuente última si surge una duda que el `.md` no resuelve. En el
+  contenido público de la página no se menciona "Tema N": el visitante no
+  tiene acceso a ese material.
 
 ---
 

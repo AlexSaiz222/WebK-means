@@ -8,6 +8,7 @@ import { MacQueen } from '../src/lib/algorithms/macqueen.ts';
 import { HartiganWong } from '../src/lib/algorithms/hartigan-wong.ts';
 import { Elkan } from '../src/lib/algorithms/elkan.ts';
 import { Fuzzy } from '../src/lib/algorithms/fuzzy.ts';
+import { kSweep, meanSilhouette } from '../src/lib/algorithms/evaluacion.ts';
 import { blobs, anisotropic, unevenDensities, moons, overlapping, rings } from '../src/lib/data/datasets.ts';
 
 let failures = 0;
@@ -136,7 +137,44 @@ console.log('\nFuzzy');
   check('cada fila de pertenencias suma 1', sums.every((s) => Math.abs(s - 1) < 1e-9));
 }
 
-// ---- 5. Todas convergen y quedan con k centroides ----
+// ---- 5. Evaluación para elegir k (codo y silueta) ----
+console.log('\nElección de k');
+{
+  const points = blobs(11, 200); // tres grupos claros
+  const seeds = [1, 2, 3, 4, 5];
+  const sweep = kSweep(points, 1, 8, seeds);
+
+  check('el barrido cubre k = 1..8', sweep.length === 8 && sweep[0]!.k === 1 && sweep[7]!.k === 8);
+
+  let decreasing = true;
+  for (let i = 1; i < sweep.length; i++) {
+    if (sweep[i]!.inertia > sweep[i - 1]!.inertia + 1e-9) decreasing = false;
+  }
+  check('la inercia (mejor de varias semillas) no crece con k', decreasing);
+
+  check('la silueta no está definida con k = 1', Number.isNaN(sweep[0]!.silhouette));
+  const inRange = sweep
+    .slice(1)
+    .every((e) => e.silhouette >= -1 - 1e-9 && e.silhouette <= 1 + 1e-9);
+  check('la silueta media queda en [-1, 1]', inRange);
+
+  let bestK = 0;
+  let bestS = -Infinity;
+  for (const e of sweep) {
+    if (Number.isFinite(e.silhouette) && e.silhouette > bestS) {
+      bestS = e.silhouette;
+      bestK = e.k;
+    }
+  }
+  check('con tres blobs, la silueta elige k = 3', bestK === 3, `k óptimo=${bestK} (s=${bestS.toFixed(3)})`);
+
+  // la silueta simplificada por centros: a = distancia al propio centro,
+  // b = al segundo mejor; con centros idénticos s = 0
+  const twin = meanSilhouette(points, [{ x: 0.5, y: 0.5 }, { x: 0.5, y: 0.5 }], points.map(() => 0));
+  check('centros idénticos → silueta 0', Math.abs(twin) < 1e-9);
+}
+
+// ---- 6. Todas convergen y quedan con k centroides ----
 console.log('\nConvergencia');
 for (const Ctor of [Lloyd, MacQueen, HartiganWong, Elkan, Fuzzy]) {
   const c: Clusterer = new (Ctor as new () => Clusterer)();

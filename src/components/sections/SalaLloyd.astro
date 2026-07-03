@@ -21,6 +21,11 @@
       Recorre la ejecución fase a fase: primero la reasignación en bloque
       (cambian las asignaciones con los centroides quietos), después la
       actualización (los centroides se desplazan a la media de su grupo).
+      Sobre el lienzo puedes activar las <em>fronteras</em>: el mapa de
+      regiones (diagrama de Voronoi) que induce cada configuración de
+      centroides. Como esas fronteras son siempre rectas, K-Means solo puede
+      formar grupos convexos; actívalas sobre las lunas o los anillos y se ve
+      por qué ahí falla.
     </p>
   </div>
 
@@ -43,6 +48,7 @@
       </div>
       <div class="canvas-wrap">
         <canvas aria-label="Visualización del ciclo por lotes de Lloyd"></canvas>
+        <button class="canvas-toggle" data-extra="voronoi" aria-pressed="false">fronteras</button>
         <p class="hint" data-hint>arrastra puntos o centroides · clic para añadir un punto</p>
       </div>
       <div class="controls timeline">
@@ -78,10 +84,46 @@
           <dt>estado</dt>
           <dd data-out="status">listo</dd>
         </div>
+        <div class="metric metric-spark">
+          <dt>evolución de la inercia</dt>
+          <dd><canvas class="spark" data-spark aria-label="Curva de la inercia a lo largo de la ejecución, con un marcador en el paso actual"></canvas></dd>
+        </div>
       </dl>
     </div>
   </div>
 </section>
+
+<style>
+  /* conmutador discreto de las fronteras de Voronoi, dentro del lienzo */
+  .canvas-toggle {
+    position: absolute;
+    top: 8px;
+    right: 10px;
+    font: inherit;
+    font-size: 0.78rem;
+    color: var(--ink-soft);
+    background: rgb(255 255 255 / 0.82);
+    border: 1px solid var(--line);
+    padding: 2px 10px;
+    cursor: pointer;
+    transition: color 120ms ease, border-color 120ms ease;
+  }
+
+  .canvas-toggle:hover {
+    color: var(--accent);
+    border-color: var(--accent);
+  }
+
+  .canvas-toggle:focus-visible {
+    outline: 2px solid var(--accent);
+    outline-offset: 2px;
+  }
+
+  .canvas-toggle[aria-pressed='true'] {
+    color: var(--accent);
+    border-color: var(--accent);
+  }
+</style>
 
 <script>
   import { Lloyd } from '../../lib/algorithms/lloyd.ts';
@@ -89,6 +131,8 @@
   import type { Point } from '../../lib/algorithms/types.ts';
   import { blobs, anisotropic, unevenDensities, moons, overlapping, rings } from '../../lib/data/datasets.ts';
   import { CanvasRenderer } from '../../lib/sim/renderer.ts';
+  import { voronoiCells } from '../../lib/sim/voronoi.ts';
+  import { drawSparkline } from '../../lib/sim/sparkline.ts';
 
   const root = document.getElementById('sala-lloyd')!;
   const canvas = root.querySelector('canvas')!;
@@ -115,8 +159,19 @@
 
   const lloyd = new Lloyd();
   const renderer = new CanvasRenderer(canvas);
-  const accent =
-    getComputedStyle(canvas).getPropertyValue('--accent').trim() || '#2D5BFF';
+  const cs = getComputedStyle(canvas);
+  const accent = cs.getPropertyValue('--accent').trim() || '#2D5BFF';
+  const inkSoft = cs.getPropertyValue('--ink-soft').trim() || '#6B6B6B';
+  const clusterColors = ['#2D5BFF', '#FF7A3D', '#12B886', '#E64980', '#F2B705', '#7048E8'].map(
+    (fb, i) => cs.getPropertyValue(`--c${i + 1}`).trim() || fb,
+  );
+
+  const sparkCanvas = root.querySelector<HTMLCanvasElement>('[data-spark]')!;
+  let showVoronoi = false;
+
+  function updateSpark() {
+    drawSparkline(sparkCanvas, history.map((f) => f.inertia), pos, { accent, soft: inkSoft });
+  }
 
   // ---- historial ----
   type Phase = 'inicio' | 'asignacion' | 'actualizacion';
@@ -265,6 +320,7 @@
     btn('play').disabled = atEnd;
     btn('step').disabled = atEnd;
     btn('back').disabled = pos === 0;
+    updateSpark();
   }
 
   function computeRun() {
@@ -420,6 +476,36 @@
     return best;
   };
 
+  // celdas de Voronoi bajo los puntos; usa los centroides tal y como se
+  // muestran, así las fronteras acompañan a la animación
+  renderer.setUnderlay((ctx, map) => {
+    if (!showVoronoi) return;
+    const cells = voronoiCells(renderer.shownCentroids);
+    cells.forEach((cell, j) => {
+      if (cell.length < 3) return;
+      ctx.beginPath();
+      cell.forEach((p, idx) => {
+        if (idx === 0) ctx.moveTo(map.x(p.x), map.y(p.y));
+        else ctx.lineTo(map.x(p.x), map.y(p.y));
+      });
+      ctx.closePath();
+      ctx.globalAlpha = 0.05;
+      ctx.fillStyle = clusterColors[j % clusterColors.length]!;
+      ctx.fill();
+      ctx.globalAlpha = 1;
+      ctx.lineWidth = 1;
+      ctx.strokeStyle = 'rgb(26 26 26 / 0.22)';
+      ctx.stroke();
+    });
+  });
+
+  const voronoiBtn = root.querySelector<HTMLButtonElement>('[data-extra="voronoi"]')!;
+  voronoiBtn.addEventListener('click', () => {
+    showVoronoi = voronoiBtn.getAttribute('aria-pressed') !== 'true';
+    voronoiBtn.setAttribute('aria-pressed', String(showVoronoi));
+    display(false);
+  });
+
   renderer.setOverlay((ctx, map) => {
     const s = current();
     if (s.phase === 'asignacion' && s.changed.length > 0) {
@@ -514,10 +600,9 @@
   canvas.style.cursor = 'crosshair';
 
   root.addEventListener('contentvisibilityautostatechange', (ev) => {
-    if ((ev as ContentVisibilityAutoStateChangeEvent).skipped) {
-      stopPlay();
-      display();
-    }
+    if ((ev as ContentVisibilityAutoStateChangeEvent).skipped) stopPlay();
+    // al volver a ser visible se repinta (el sparkline necesita medidas reales)
+    display(false);
   });
 
   // gancho para verificación

@@ -1,0 +1,519 @@
+---
+/**
+ * Sección 3 — ¿Y cómo se elige k? Coda tras las cinco salas: hasta aquí k se
+ * ha fijado a mano; aquí se muestran los métodos clásicos para elegirlo.
+ * Curva del codo (inercia frente a k) y silueta media (versión simplificada
+ * por centros, ver docs/ALGORITMOS.md) para k = 1..8; clic en un k muestra
+ * ese agrupamiento al lado.
+ */
+---
+
+<section class="section" id="elegir-k" aria-labelledby="elegirk-titulo">
+  <div class="prose reveal">
+    <h2 id="elegirk-titulo">¿Y cómo se elige k?</h2>
+    <p>
+      En todas las salas has movido el deslizador de <em>k</em> a mano; en un
+      problema real nadie te dice cuántos grupos hay. Dos métodos clásicos
+      responden con las mismas piezas que ya conoces. El
+      <strong>método del codo</strong> traza la inercia frente a <em>k</em>: la
+      inercia siempre disminuye al añadir clústeres, así que el mínimo no
+      sirve de criterio; lo que se busca es el punto donde la caída
+      <em>se desacelera</em> y la curva forma un codo. Es rápido, pero puede
+      resultar subjetivo en datos complejos.
+    </p>
+    <p>
+      El <strong>coeficiente de la silueta</strong> es más preciso: para cada
+      punto se toma la distancia <em>a</em> a su propio centro y la distancia
+      <em>b</em> al segundo mejor centro, y se calcula
+      <em>s&nbsp;=&nbsp;(b&nbsp;−&nbsp;a)&nbsp;/&nbsp;max(a,&nbsp;b)</em>.
+      Cerca de 1, el punto está bien agrupado; cerca de 0, en la frontera;
+      negativo, probablemente en el grupo equivocado. El <em>k</em> óptimo es
+      el que maximiza la silueta media. Existe un tercer método, la
+      <strong>estadística de brecha</strong>: compara la inercia de los datos
+      reales con la de datos aleatorios sin estructura y elige el <em>k</em>
+      que maximiza esa diferencia.
+    </p>
+  </div>
+
+  <div class="lab reveal">
+    <div class="panel">
+      <div class="controls toolbar">
+        <div class="seg" role="group" aria-label="forma de los datos">
+          <button class="seg-btn" data-shape="redondos" aria-pressed="true">redondos</button>
+          <button class="seg-btn" data-shape="solapados" aria-pressed="false">solapados</button>
+          <button class="seg-btn" data-shape="alargados" aria-pressed="false">alargados</button>
+          <button class="seg-btn" data-shape="desiguales" aria-pressed="false">desiguales</button>
+          <button class="seg-btn" data-shape="lunas" aria-pressed="false">lunas</button>
+          <button class="seg-btn" data-shape="anillos" aria-pressed="false">anillos</button>
+        </div>
+        <button class="btn" data-action="regen">otra muestra</button>
+        <div class="seg metodo" role="group" aria-label="método de evaluación">
+          <button class="seg-btn" data-metric="codo" aria-pressed="true">codo (inercia)</button>
+          <button class="seg-btn" data-metric="silueta" aria-pressed="false">silueta</button>
+        </div>
+      </div>
+      <div class="elegirk-grid">
+        <div class="chart-col">
+          <canvas
+            class="chart"
+            tabindex="0"
+            aria-label="Curva de la métrica elegida para k entre 1 y 8; cada punto es una ejecución completa de K-Means. Selecciona un k con clic o con las flechas del teclado."
+          ></canvas>
+        </div>
+        <figure class="preview-fig">
+          <canvas class="preview" aria-label="Agrupamiento resultante con el k seleccionado; los centroides se pueden arrastrar y la ejecución se recalcula desde esa configuración"></canvas>
+          <figcaption class="caption" data-out="sel">·</figcaption>
+        </figure>
+      </div>
+      <div class="narration-box">
+        <span class="phase-chip" data-out="phase">codo</span>
+        <p class="narration" data-out="narration">·</p>
+      </div>
+      <dl class="metrics">
+        <div class="metric">
+          <dt>k seleccionado</dt>
+          <dd data-out="ksel">·</dd>
+        </div>
+        <div class="metric">
+          <dt>inercia (SSE)</dt>
+          <dd data-out="inertia">·</dd>
+        </div>
+        <div class="metric">
+          <dt>silueta media</dt>
+          <dd data-out="sil">·</dd>
+        </div>
+      </dl>
+    </div>
+    <p class="caption elegirk-nota">
+      Cada punto de la curva es una ejecución completa de K-Means (Lloyd) hasta
+      converger, con varias inicializaciones y quedándose con la mejor. En el
+      lienzo lateral puedes <strong>arrastrar los centroides</strong>: la
+      ejecución se recalcula desde esa configuración y la curva se actualiza
+      (si acaba en un mínimo peor, lo verás subir). Prueba las lunas o los
+      anillos: ninguna curva encuentra un buen k, porque el fallo no está en k
+      sino en la forma de los grupos.
+    </p>
+  </div>
+</section>
+
+<style>
+  .elegirk-grid {
+    display: grid;
+    grid-template-columns: 1fr 250px;
+    gap: 20px;
+    padding: 16px;
+    align-items: center;
+  }
+
+  .chart-col {
+    min-width: 0;
+  }
+
+  .elegirk-grid canvas.chart {
+    display: block;
+    width: 100%;
+    height: 240px;
+    aspect-ratio: auto;
+    background: transparent;
+  }
+
+  .elegirk-grid canvas.chart:focus-visible {
+    outline: 2px solid var(--accent);
+    outline-offset: 2px;
+  }
+
+  .preview-fig {
+    margin: 0;
+  }
+
+  .elegirk-grid canvas.preview {
+    border: 1px solid var(--line);
+  }
+
+  .preview-fig .caption {
+    margin: 8px 0 0;
+  }
+
+  .elegirk-nota {
+    margin-block-start: 12px;
+    max-width: 78ch;
+  }
+
+  .toolbar .metodo {
+    margin-left: auto;
+  }
+
+  @media (max-width: 640px) {
+    .elegirk-grid {
+      grid-template-columns: 1fr;
+    }
+
+    .toolbar .metodo {
+      margin-left: 0;
+    }
+  }
+</style>
+
+<script>
+  import { kSweep, runLloyd, meanSilhouette } from '../../lib/algorithms/evaluacion.ts';
+  import type { KSweepEntry } from '../../lib/algorithms/evaluacion.ts';
+  import { nearest } from '../../lib/algorithms/kmeans-base.ts';
+  import type { Point } from '../../lib/algorithms/types.ts';
+  import { blobs, anisotropic, unevenDensities, moons, overlapping, rings } from '../../lib/data/datasets.ts';
+  import { CanvasRenderer } from '../../lib/sim/renderer.ts';
+
+  const root = document.getElementById('elegir-k')!;
+  const chart = root.querySelector<HTMLCanvasElement>('.chart')!;
+  const preview = root.querySelector<HTMLCanvasElement>('.preview')!;
+  const out = (n: string) => root.querySelector<HTMLElement>(`[data-out="${n}"]`)!;
+
+  const SHAPES: Record<string, (seed: number, n: number) => Point[]> = {
+    redondos: blobs,
+    solapados: overlapping,
+    alargados: anisotropic,
+    desiguales: unevenDensities,
+    lunas: moons,
+    anillos: rings,
+  };
+
+  const K_MIN = 1;
+  const K_MAX = 8;
+  let shape = 'redondos';
+  let dataSeed = 61;
+  let metric: 'codo' | 'silueta' = 'codo';
+  let points: Point[] = SHAPES[shape]!(dataSeed, 150);
+  let sweep: KSweepEntry[] = [];
+  let kSel = 3;
+
+  const cs = getComputedStyle(chart);
+  const accent = cs.getPropertyValue('--accent').trim() || '#2D5BFF';
+  const ink = cs.getPropertyValue('--ink').trim() || '#1A1A1A';
+  const inkSoft = cs.getPropertyValue('--ink-soft').trim() || '#6B6B6B';
+  const lineColor = cs.getPropertyValue('--line').trim() || '#E6E6E1';
+
+  const previewRenderer = new CanvasRenderer(preview);
+  /** posiciones en px de cada k en la curva (para el clic) */
+  let dotPos: Array<{ x: number; y: number; k: number }> = [];
+
+  function compute() {
+    const seeds = [1, 2, 3, 4, 5].map((i) => dataSeed * 31 + i);
+    sweep = kSweep(points, K_MIN, K_MAX, seeds);
+    refresh();
+  }
+
+  const entry = (k: number) => sweep.find((e) => e.k === k);
+
+  /** k del codo: mayor desaceleración de la caída (2.ª diferencia); orientativo. */
+  function elbowK(): number {
+    let best = 2;
+    let bestV = -Infinity;
+    for (let k = 2; k <= K_MAX - 1; k++) {
+      const a = entry(k - 1)?.inertia ?? NaN;
+      const b = entry(k)?.inertia ?? NaN;
+      const c = entry(k + 1)?.inertia ?? NaN;
+      const v = a - b - (b - c);
+      if (Number.isFinite(v) && v > bestV) {
+        bestV = v;
+        best = k;
+      }
+    }
+    return best;
+  }
+
+  function silhouetteK(): number {
+    let best = 2;
+    let bestV = -Infinity;
+    for (const e of sweep) {
+      if (Number.isFinite(e.silhouette) && e.silhouette > bestV) {
+        bestV = e.silhouette;
+        best = e.k;
+      }
+    }
+    return best;
+  }
+
+  function narration(): string {
+    const e = entry(kSel);
+    if (!e) return '·';
+    if (metric === 'codo') {
+      const prev = entry(kSel - 1);
+      const drop = prev ? Math.round((1 - e.inertia / prev.inertia) * 100) : null;
+      const paso =
+        drop === null
+          ? `Con k=1 toda la muestra es un único clúster: la inercia es máxima.`
+          : `De k=${kSel - 1} a k=${kSel} la inercia cae un <strong>${drop}&nbsp;%</strong>.`;
+      return (
+        `${paso} La inercia siempre baja al añadir clústeres; el codo está donde la caída se frena. ` +
+        `Aquí se insinúa en <strong>k=${elbowK()}</strong>, aunque el método es subjetivo: júzgalo sobre la curva.`
+      );
+    }
+    const bestK = silhouetteK();
+    const bestS = entry(bestK)?.silhouette ?? NaN;
+    const propio =
+      kSel === bestK
+        ? `Es el máximo de la curva: según la silueta, este es el k óptimo.`
+        : `El máximo está en <strong>k=${bestK}</strong> (s=${bestS.toFixed(2)}): ese sería el k óptimo según la silueta.`;
+    return (
+      `Con k=${kSel} la silueta media es <strong>${e.silhouette.toFixed(2)}</strong> ` +
+      `(1 = puntos bien agrupados, 0 = en la frontera). ${propio}`
+    );
+  }
+
+  function drawChart() {
+    const ctx = chart.getContext('2d');
+    if (!ctx) return;
+    const rect = chart.getBoundingClientRect();
+    if (rect.width === 0) return;
+    const dpr = window.devicePixelRatio || 1;
+    chart.width = Math.round(rect.width * dpr);
+    chart.height = Math.round(rect.height * dpr);
+    ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+    const w = rect.width;
+    const h = rect.height;
+    const mLeft = 52;
+    const mRight = 16;
+    const mTop = 14;
+    const mBottom = 30;
+    ctx.clearRect(0, 0, w, h);
+    if (sweep.length === 0) return;
+
+    const pts = sweep
+      .map((e) => ({ k: e.k, v: metric === 'codo' ? e.inertia : e.silhouette }))
+      .filter((p) => Number.isFinite(p.v));
+    if (pts.length === 0) return;
+    let min = Infinity;
+    let max = -Infinity;
+    for (const p of pts) {
+      if (p.v < min) min = p.v;
+      if (p.v > max) max = p.v;
+    }
+    const span = max - min || 1;
+    const x = (k: number) => mLeft + ((k - K_MIN) / (K_MAX - K_MIN)) * (w - mLeft - mRight);
+    const y = (v: number) => h - mBottom - ((v - min) / span) * (h - mTop - mBottom);
+
+    // rejilla horizontal ligera
+    ctx.strokeStyle = lineColor;
+    ctx.lineWidth = 1;
+    for (const t of [0.25, 0.5, 0.75]) {
+      const gy = mTop + t * (h - mTop - mBottom);
+      ctx.globalAlpha = 0.55;
+      ctx.beginPath();
+      ctx.moveTo(mLeft, gy + 0.5);
+      ctx.lineTo(w - mRight, gy + 0.5);
+      ctx.stroke();
+      ctx.globalAlpha = 1;
+    }
+
+    // ejes
+    ctx.beginPath();
+    ctx.moveTo(mLeft, mTop);
+    ctx.lineTo(mLeft, h - mBottom + 0.5);
+    ctx.lineTo(w - mRight, h - mBottom + 0.5);
+    ctx.stroke();
+    ctx.fillStyle = inkSoft;
+    ctx.font = '11px system-ui, sans-serif';
+    ctx.textAlign = 'right';
+    ctx.fillText(max.toFixed(2), mLeft - 6, y(max) + 4);
+    ctx.fillText(min.toFixed(2), mLeft - 6, y(min) + 4);
+
+    // etiquetas de k bajo el eje
+    ctx.textAlign = 'center';
+    dotPos = [];
+    for (const p of pts) {
+      ctx.fillStyle = p.k === kSel ? accent : inkSoft;
+      ctx.font = p.k === kSel ? 'bold 12px system-ui, sans-serif' : '12px system-ui, sans-serif';
+      ctx.fillText(String(p.k), x(p.k), h - 10);
+    }
+    // relleno sutil bajo la curva
+    ctx.beginPath();
+    pts.forEach((p, i) => {
+      if (i === 0) ctx.moveTo(x(p.k), y(p.v));
+      else ctx.lineTo(x(p.k), y(p.v));
+    });
+    ctx.lineTo(x(pts[pts.length - 1]!.k), h - mBottom);
+    ctx.lineTo(x(pts[0]!.k), h - mBottom);
+    ctx.closePath();
+    ctx.globalAlpha = 0.06;
+    ctx.fillStyle = accent;
+    ctx.fill();
+    ctx.globalAlpha = 1;
+
+    // curva
+    ctx.strokeStyle = accent;
+    ctx.lineWidth = 1.8;
+    ctx.lineJoin = 'round';
+    ctx.beginPath();
+    pts.forEach((p, i) => {
+      if (i === 0) ctx.moveTo(x(p.k), y(p.v));
+      else ctx.lineTo(x(p.k), y(p.v));
+    });
+    ctx.stroke();
+
+    // puntos; un aro marca el k que sugiere cada método
+    const marked = metric === 'silueta' ? silhouetteK() : elbowK();
+    for (const p of pts) {
+      const px = x(p.k);
+      const py = y(p.v);
+      dotPos.push({ x: px, y: py, k: p.k });
+      ctx.beginPath();
+      ctx.arc(px, py, p.k === kSel ? 5.5 : 4, 0, Math.PI * 2);
+      ctx.fillStyle = p.k === kSel ? accent : '#FFFFFF';
+      ctx.fill();
+      ctx.lineWidth = 1.8;
+      ctx.strokeStyle = accent;
+      ctx.stroke();
+      if (p.k === marked) {
+        ctx.beginPath();
+        ctx.arc(px, py, 9.5, 0, Math.PI * 2);
+        ctx.lineWidth = 1.4;
+        ctx.strokeStyle = ink;
+        ctx.stroke();
+      }
+    }
+  }
+
+  function refresh() {
+    drawChart();
+    const e = entry(kSel);
+    if (e) previewRenderer.setState({ points, labels: e.labels, centroids: e.centroids }, false);
+    out('sel').textContent = `agrupamiento con k = ${kSel} · arrastra los centroides`;
+    out('phase').textContent = metric === 'codo' ? 'codo' : 'silueta';
+    out('narration').innerHTML = narration();
+    out('ksel').textContent = String(kSel);
+    out('inertia').textContent = e ? e.inertia.toFixed(3) : '·';
+    out('sil').textContent = e && Number.isFinite(e.silhouette) ? e.silhouette.toFixed(2) : '·';
+  }
+
+  function select(k: number) {
+    const lo = metric === 'silueta' ? 2 : K_MIN;
+    kSel = Math.min(K_MAX, Math.max(lo, k));
+    refresh();
+  }
+
+  chart.addEventListener('pointerdown', (ev) => {
+    const rect = chart.getBoundingClientRect();
+    const px = ev.clientX - rect.left;
+    let best = -1;
+    let bestD = Infinity;
+    for (const d of dotPos) {
+      const dd = Math.abs(d.x - px);
+      if (dd < bestD) {
+        bestD = dd;
+        best = d.k;
+      }
+    }
+    if (best > 0) {
+      select(best);
+      chart.focus({ preventScroll: true });
+    }
+  });
+
+  chart.addEventListener('keydown', (ev) => {
+    if (ev.key !== 'ArrowLeft' && ev.key !== 'ArrowRight') return;
+    ev.preventDefault();
+    select(kSel + (ev.key === 'ArrowRight' ? 1 : -1));
+  });
+
+  // ---- arrastrar centroides en el previo: al soltar, Lloyd se reejecuta
+  // desde esa configuración y la entrada de la curva se actualiza ----
+  const clamp01 = (v: number) => Math.min(0.98, Math.max(0.02, v));
+  let dragC = -1;
+  let dragCentroids: Point[] | null = null;
+
+  const hitCentroid = (p: Point): number => {
+    const e = entry(kSel);
+    if (!e) return -1;
+    const tol = previewRenderer.pxToData(14);
+    let best = -1;
+    let bestD = tol * tol;
+    e.centroids.forEach((c, j) => {
+      const d = (c.x - p.x) ** 2 + (c.y - p.y) ** 2;
+      if (d < bestD) {
+        bestD = d;
+        best = j;
+      }
+    });
+    return best;
+  };
+
+  preview.addEventListener('pointerdown', (ev) => {
+    const p = previewRenderer.eventToData(ev);
+    const cIdx = hitCentroid(p);
+    if (cIdx < 0) return;
+    const e = entry(kSel)!;
+    dragC = cIdx;
+    dragCentroids = e.centroids.map((c) => ({ ...c }));
+    preview.style.cursor = 'grabbing';
+    try { preview.setPointerCapture(ev.pointerId); } catch { /* puntero sintético o ya liberado */ }
+  });
+
+  preview.addEventListener('pointermove', (ev) => {
+    const p = previewRenderer.eventToData(ev);
+    if (dragC >= 0 && dragCentroids) {
+      dragCentroids[dragC] = { x: clamp01(p.x), y: clamp01(p.y) };
+      // avance en vivo: reasignación al más cercano mientras se arrastra
+      const labels = points.map((q) => nearest(q, dragCentroids!).index);
+      previewRenderer.setState({ points, labels, centroids: dragCentroids }, false);
+      return;
+    }
+    preview.style.cursor = hitCentroid(p) >= 0 ? 'grab' : 'default';
+  });
+
+  preview.addEventListener('pointerup', () => {
+    if (dragC < 0 || !dragCentroids) return;
+    dragC = -1;
+    preview.style.cursor = 'grab';
+    const run = runLloyd(points, kSel, 1, dragCentroids);
+    dragCentroids = null;
+    const e = entry(kSel);
+    if (e) {
+      e.centroids = run.centroids;
+      e.labels = run.labels;
+      e.inertia = run.inertia;
+      e.silhouette = meanSilhouette(points, run.centroids, run.labels);
+    }
+    refresh();
+  });
+
+  for (const b of root.querySelectorAll<HTMLButtonElement>('[data-metric]')) {
+    b.addEventListener('click', () => {
+      metric = b.dataset.metric as typeof metric;
+      for (const other of root.querySelectorAll('[data-metric]')) {
+        other.setAttribute('aria-pressed', String(other === b));
+      }
+      if (metric === 'silueta' && kSel < 2) kSel = 2;
+      refresh();
+    });
+  }
+
+  for (const b of root.querySelectorAll<HTMLButtonElement>('.seg-btn[data-shape]')) {
+    b.addEventListener('click', () => {
+      shape = b.dataset.shape!;
+      for (const other of root.querySelectorAll('.seg-btn[data-shape]')) {
+        other.setAttribute('aria-pressed', String(other === b));
+      }
+      points = SHAPES[shape]!(dataSeed, 150);
+      compute();
+    });
+  }
+
+  root.querySelector<HTMLButtonElement>('[data-action="regen"]')!.addEventListener('click', () => {
+    dataSeed++;
+    points = SHAPES[shape]!(dataSeed, 150);
+    compute();
+  });
+
+  new ResizeObserver(() => drawChart()).observe(chart);
+  root.addEventListener('contentvisibilityautostatechange', (ev) => {
+    if (!(ev as ContentVisibilityAutoStateChangeEvent).skipped) refresh();
+  });
+
+  // gancho para verificación
+  (window as unknown as Record<string, unknown>).__labElegirK = {
+    k: () => kSel,
+    centroids: () => (entry(kSel)?.centroids ?? []).map((c) => ({ ...c })),
+    inertia: () => entry(kSel)?.inertia ?? NaN,
+  };
+
+  compute();
+</script>

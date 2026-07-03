@@ -1,0 +1,8 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32">
+  <!-- el glifo del centroide de la página: aro con punto central, más dos puntos satélite -->
+  <rect width="32" height="32" fill="#FAFAF8" rx="6"/>
+  <circle cx="14" cy="15" r="7" fill="#FFFFFF" stroke="#2D5BFF" stroke-width="2.6"/>
+  <circle cx="14" cy="15" r="2.4" fill="#2D5BFF"/>
+  <circle cx="25.5" cy="8.5" r="3" fill="#FF7A3D"/>
+  <circle cx="24.5" cy="24.5" r="3" fill="#12B886"/>
+</svg>
