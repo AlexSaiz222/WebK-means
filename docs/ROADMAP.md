@@ -9,7 +9,7 @@ de empezar el siguiente. No adelantes trabajo de hitos posteriores.
 
 - Inicializar Astro + TypeScript (plantilla mínima, salida estática, modo
   `strict` de TypeScript).
-- Crear la estructura de carpetas de `CLAUDE.md` (`pages/`, `layouts/`,
+- Crear la estructura de carpetas del proyecto (`pages/`, `layouts/`,
   `components/`, `lib/`, `styles/`).
 - Definir `src/lib/algorithms/types.ts` con la interfaz `Clusterer` y el tipo
   `Point`.

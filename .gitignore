@@ -4,3 +4,6 @@ dist/
 
 # material de la asignatura con copyright: no se distribuye
 docs/*.pdf
+
+# notas internas de trabajo: no se distribuyen
+CLAUDE.md
