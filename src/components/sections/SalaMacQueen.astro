@@ -15,17 +15,21 @@
       que ya no representa a su grupo. MacQueen corrige ese problema procesando
       los puntos <strong>de uno en uno</strong>: en cuanto un punto se asigna a
       un clúster, ese centroide se recalcula al instante mediante la
-      <em>media incremental</em>. Esto supone más tiempo de cálculo por
-      iteración, pero al ajustarse sobre la marcha suele converger en menos
-      pasadas y se adapta bien a datos que llegan en
+      <em>media incremental</em>. Como en Lloyd, una <strong>iteración</strong>
+      es una pasada completa por todos los puntos, y el algoritmo repite
+      iteraciones hasta que ninguna asignación cambia. Cada iteración cuesta
+      más cálculo que en Lloyd, pero al ajustarse sobre la marcha suele
+      necesitar menos, y se adapta bien a datos que llegan en
       <strong>flujo continuo</strong>.
     </p>
     <p>
-      La contrapartida es que el <strong>orden de llegada importa</strong>:
-      procesar los mismos datos en otro orden puede producir un agrupamiento
-      distinto, algo que no ocurre con la actualización por lotes de Lloyd.
-      Activa <em>barajar orden</em> para comprobarlo con los mismos datos y la
-      misma inicialización.
+      La contrapartida es que el <strong>orden de llegada importa</strong>.
+      Para comprobarlo sirve <em>barajar orden</em>: mantiene los mismos datos
+      y la misma inicialización y solo cambia el orden en que se procesan los
+      puntos. Si el resultado final difiere del obtenido con el orden original
+      (mira la métrica <em>frente al orden original</em>), la sensibilidad al
+      orden queda demostrada. Con la actualización por lotes de Lloyd esto no
+      ocurre.
     </p>
   </div>
 
@@ -278,16 +282,35 @@
   function narration(): string {
     const s = current();
     if (s.phase === 'inicio') {
+      const barajado = shuffleActive
+        ? ' El orden de llegada está <strong>barajado</strong>: mismos datos y misma inicialización, distinto orden.'
+        : '';
       return (
-        'Centroides inicializados con k-means++. Pulsa <strong>reproducir</strong> o avanza con <strong>→</strong> ' +
-        'para ver la asignación secuencial, punto por punto.'
+        'Centroides inicializados con k-means++. Cada iteración procesa los puntos de uno en uno; ' +
+        'el algoritmo termina cuando una iteración completa no cambia ninguna asignación.' +
+        barajado +
+        ' Pulsa <strong>reproducir</strong> o avanza con <strong>→</strong>.'
       );
     }
+    // ¿es el primer punto de una iteración nueva? explica por qué se repite
+    const prev = history[pos - 1];
+    const nuevaIteracion =
+      prev && prev.iteration !== s.iteration && s.iteration > 1
+        ? 'La iteración anterior tuvo cambios de asignación, así que se recorre de nuevo todo el conjunto. '
+        : '';
     const colorIdx = s.labels[s.pointIndex]!;
-    const conv = s.converged
-      ? ' Ninguna asignación cambió en la pasada completa: <strong>convergido</strong>.'
-      : '';
+    let conv = '';
+    if (s.converged) {
+      conv = ' Ninguna asignación cambió en la iteración completa: <strong>convergido</strong>.';
+      if (shuffleActive) {
+        conv +=
+          Math.abs(last().inertia - originalInertia) > 1e-5
+            ? ' Con este orden el resultado es <strong>distinto</strong> al del orden original: la sensibilidad al orden, demostrada.'
+            : ' Con esta muestra, los órdenes probados terminan en el mismo resultado; prueba con otra muestra.';
+      }
+    }
     return (
+      nuevaIteracion +
       `El punto ${s.pointIndex + 1} se asigna al clúster ${colorIdx + 1} y ese centroide ` +
       `se recalcula al instante (media incremental).${conv}`
     );
@@ -302,9 +325,7 @@
     posInput.style.setProperty('--p', `${total > 0 ? (pos / total) * 100 : 0}%`);
     out('pos-label').textContent = `paso ${pos} de ${total}`;
     out('phase').textContent =
-      s.phase === 'ingesta'
-        ? `pasada ${s.iteration} · online`
-        : 'inicio';
+      s.phase === 'ingesta' ? `iteración ${s.iteration}` : 'inicio';
     out('narration').innerHTML = narration();
     // posición dentro de la pasada actual, no del historial completo
     out('count').textContent =
@@ -420,8 +441,18 @@
   btn('shuffle').addEventListener('click', () => {
     shuffleActive = !shuffleActive;
     btn('shuffle').setAttribute('aria-pressed', String(shuffleActive));
-    if (shuffleActive) shuffleSeed++;
-    reinit();
+    if (shuffleActive) {
+      // busca un orden que cambie el resultado (con la mayoría de muestras
+      // existe); si tras varios intentos ninguno difiere, se dirá honestamente
+      let distinto = false;
+      for (let intento = 0; intento < 15 && !distinto; intento++) {
+        shuffleSeed++;
+        reinit();
+        distinto = Math.abs(last().inertia - originalInertia) > 1e-5;
+      }
+    } else {
+      reinit();
+    }
   });
 
   posInput.addEventListener('input', () => {

@@ -77,7 +77,7 @@ una añade la interacción que aísla su diferencia:
   puede descartar un centroide sin medir la distancia.
 - Mensaje: misma respuesta, mucho menos trabajo; brilla en datos grandes.
 
-### 2.5 Fuzzy C-Means: pertenencias graduales
+### 2.5 Fuzzy K-Means: pertenencias graduales
 - Los puntos no tienen color sólido: llevan la **mezcla** de sus pertenencias.
 - Deslizador para la borrosidad `m` (endurece hacia el K-Means clásico o
   difumina las fronteras) y lectura de porcentajes al señalar un punto.

@@ -405,7 +405,7 @@
     const cost = best < 0 ? Infinity : costs[best]!;
     const moves = cost < gain;
     out('probe').textContent =
-      `salir: ${(gain * 1000).toFixed(2)} · entrar: ${(cost * 1000).toFixed(2)} → ` +
+      `ganancia por salir: ${gain.toFixed(4)} · coste por entrar: ${cost.toFixed(4)} → ` +
       (moves ? 'se movería' : 'se queda');
 
     const p = points[i]!;

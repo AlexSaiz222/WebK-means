@@ -1,6 +1,6 @@
 ---
 /**
- * Sala 2.5 — Fuzzy C-Means: pertenencias graduales. Los puntos no tienen color
+ * Sala 2.5 — Fuzzy K-Means: pertenencias graduales. Los puntos no tienen color
  * sólido: llevan una mezcla según su grado de pertenencia a cada clúster. El
  * deslizador `m` endurece o difumina las fronteras; señalar un punto muestra
  * sus porcentajes.
@@ -9,10 +9,10 @@
 
 <section class="section" id="sala-fuzzy" aria-labelledby="fuzzy-titulo">
   <div class="prose reveal">
-    <h2 id="fuzzy-titulo">Fuzzy C-Means: pertenencias graduales</h2>
+    <h2 id="fuzzy-titulo">Fuzzy K-Means: pertenencias graduales</h2>
     <p>
       Las variantes anteriores asignan cada punto a un único clúster. Fuzzy
-      C-Means relaja esa restricción: cada punto tiene un
+      K-Means relaja esa restricción: cada punto tiene un
       <strong>grado de pertenencia</strong> a cada clúster, entre 0 y 1 y con
       suma 1 (puede ser 70&nbsp;% de uno y 30&nbsp;% de otro), y su color es
       esa mezcla. Es la variante adecuada cuando los límites entre grupos no
@@ -22,14 +22,17 @@
       evaluación de riesgos.
     </p>
     <p>
-      El parámetro de borrosidad <em>m</em> controla la transición: con valores
-      próximos a 1 las pertenencias tienden a una asignación dura, como en el
-      K-Means clásico; con valores altos se reparten y las fronteras se
-      difuminan. Esta flexibilidad admite grupos solapados, aporta robustez
-      ante ruido y valores atípicos, y da una lectura más rica de los datos; a
-      cambio es más costoso computacionalmente, y elegir bien <em>k</em> y las
-      funciones de pertenencia puede requerir experiencia. Tras converger,
-      señala los puntos de frontera para leer sus porcentajes de pertenencia.
+      El parámetro de borrosidad <em>m</em> (normalmente 2) controla la
+      transición: con valores próximos a 1 las pertenencias tienden a una
+      asignación dura, como en el K-Means clásico; con valores altos se
+      reparten y las fronteras se difuminan. Para obtener una etiqueta final se
+      <strong>desfuzzifica</strong>: cada punto se queda con el clúster de
+      mayor pertenencia (así se calcula aquí la inercia dura). Esta
+      flexibilidad admite grupos solapados, aporta robustez ante ruido y
+      valores atípicos, y da una lectura más rica de los datos; a cambio es
+      más costoso computacionalmente, y elegir bien <em>k</em> y las funciones
+      de pertenencia puede requerir experiencia. Tras converger, señala los
+      puntos de frontera para leer sus porcentajes de pertenencia.
     </p>
   </div>
 
@@ -55,7 +58,7 @@
         </label>
       </div>
       <div class="canvas-wrap">
-        <canvas aria-label="Visualización de Fuzzy C-Means: cada punto se colorea con la mezcla de sus pertenencias"></canvas>
+        <canvas aria-label="Visualización de Fuzzy K-Means: cada punto se colorea con la mezcla de sus pertenencias"></canvas>
         <p class="hint" data-hint>arrastra puntos/centroides · clic para añadir · pasa el ratón por un punto</p>
       </div>
       <div class="controls timeline">

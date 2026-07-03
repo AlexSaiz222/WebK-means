@@ -166,7 +166,7 @@ punto-centroide individual que el algoritmo realmente computa (no las que evita)
 
 ---
 
-## 5. Fuzzy / Soft K-Means (Fuzzy C-Means)
+## 5. Soft K-Means / Fuzzy K-Means
 
 Rompe la asignación rígida: cada punto tiene un **grado de pertenencia** a cada
 clúster, entre 0 y 1, y la suma de sus pertenencias es 1. Un punto puede ser

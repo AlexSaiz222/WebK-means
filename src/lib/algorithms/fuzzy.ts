@@ -2,13 +2,13 @@ import type { Clusterer, ClustererMetrics, Point } from './types.ts';
 import { MAX_ITER, mulberry32, dist, inertia } from './kmeans-base.ts';
 
 /**
- * Fuzzy / Soft K-Means (Fuzzy C-Means) — cada punto tiene un grado de
+ * Fuzzy / Soft K-Means (Fuzzy K-Means) — cada punto tiene un grado de
  * pertenencia a cada clúster (cada fila suma 1). El parámetro de borrosidad
  * `m` controla cuán difusas son las fronteras: m → 1⁺ endurece hacia el
  * K-Means clásico; m alto reparte las pertenencias.
  */
 export class Fuzzy implements Clusterer {
-  readonly name: string = 'Fuzzy C-Means';
+  readonly name: string = 'Fuzzy K-Means';
   /** Borrosidad; ajustable en caliente desde el deslizador de la sala. */
   m = 2;
   private points: Point[] = [];
