@@ -1,545 +1,294 @@
 ---
 /**
- * Sección 1 — La esencia de K-Means. Sandbox con el K-Means base (Lloyd):
- * arranque aleatorio de centroides, cada iteración partida en sus dos fases
- * (asignación / actualización) con narración en un recuadro, y una línea de
- * tiempo para recorrer la ejecución adelante y atrás.
+ * Sección 1 — La esencia de K-Means. Contexto (aprendizaje no supervisado,
+ * sensibilidad a la inicialización) y un diagrama estático de las fases del
+ * ciclo: inicialización, asignación y actualización. Las coordenadas del
+ * diagrama están calculadas de verdad (asignación al más cercano y medias),
+ * no dibujadas a ojo. El laboratorio interactivo llega en la sala de Lloyd.
  */
 ---
 
 <section class="section" id="fundamento" aria-labelledby="fundamento-titulo">
-  <div class="prose reveal">
+  <div class="intro reveal">
     <h2 id="fundamento-titulo">La esencia de K-Means</h2>
     <p>
-      Todo K-Means juega la misma partida: elegir <em>k</em> puntos de
-      referencia, los <strong>centroides</strong>, y repetir un ciclo de dos
-      movimientos. Primero la <strong>asignación</strong>: cada punto se apunta
-      al centroide que tiene más cerca. Después la
-      <strong>actualización</strong>: cada centroide se muda al centro de
-      gravedad de los puntos que lo eligieron. Cuando los centroides dejan de
-      moverse, el algoritmo ha llegado a la <strong>convergencia</strong>.
+      K-Means es un algoritmo de <strong>aprendizaje no supervisado</strong>:
+      particiona un conjunto de datos en <em>k</em> grupos o clústeres sin
+      necesidad de etiquetas previas, y destaca por su simplicidad y eficacia
+      sobre grandes volúmenes de datos. Todas sus variantes comparten el mismo
+      esquema: elegir <em>k</em> puntos de referencia, los
+      <strong>centroides</strong>, y repetir un ciclo de dos fases. Primero la
+      <strong>asignación</strong>: cada punto se asigna al centroide más
+      cercano (con distancia euclídea). Después la
+      <strong>actualización</strong>: cada centroide se recalcula como la media
+      de los puntos que tiene asignados. Cuando los centroides dejan de moverse
+      por encima de una tolerancia, o se alcanza un máximo de iteraciones, el
+      algoritmo ha llegado a la <strong>convergencia</strong>.
     </p>
     <p>
-      Aquí los centroides empiezan en <strong>posiciones aleatorias</strong>,
-      lejos de su sitio, para que puedas ver el ciclo trabajar. Recorre la
-      ejecución con las flechas y lee en el recuadro qué hace cada fase.
-      Puedes añadir puntos con un clic, arrastrarlos, o
-      <strong>agarrar un centroide</strong> y dejarlo donde quieras: la
-      ejecución continúa desde ahí. Cuando lo tengas dominado, sigue bajando:
-      hay cinco formas distintas de ejecutar este mismo ciclo.
+      La calidad del resultado depende de dónde partan los centroides: la
+      <strong>sensibilidad a la inicialización</strong> es un problema común a
+      la mayoría de implementaciones de K-Means, y varias de las variantes que
+      verás nacen para mitigarlo. El diagrama muestra una vuelta completa del
+      ciclo sobre un conjunto de ejemplo; en la siguiente sección puedes
+      ejecutar este mismo ciclo paso a paso y comprobarlo directamente.
     </p>
   </div>
 
   <div class="lab reveal">
-    <div class="panel">
-      <div class="controls toolbar">
-        <div class="seg" role="group" aria-label="forma de los datos">
-          <button class="seg-btn" data-shape="redondos" aria-pressed="true">redondos</button>
-          <button class="seg-btn" data-shape="alargados" aria-pressed="false">alargados</button>
-          <button class="seg-btn" data-shape="desiguales" aria-pressed="false">desiguales</button>
-          <button class="seg-btn" data-shape="lunas" aria-pressed="false">lunas</button>
+    <figure class="ciclo">
+      <div class="fases">
+        <div class="fase">
+          <svg
+            viewBox="0 0 260 190"
+            role="img"
+            aria-label="Fase de inicialización: los puntos aún sin asignar, en gris, y tres centroides colocados en posiciones arbitrarias"
+          >
+            <circle cx="82.1" cy="55.1" r="4" fill="var(--ink-soft)" opacity="0.8" />
+            <circle cx="174.1" cy="61.4" r="4" fill="var(--ink-soft)" opacity="0.8" />
+            <circle cx="140.3" cy="141.2" r="4" fill="var(--ink-soft)" opacity="0.8" />
+            <circle cx="72.7" cy="69.1" r="4" fill="var(--ink-soft)" opacity="0.8" />
+            <circle cx="190.2" cy="53.8" r="4" fill="var(--ink-soft)" opacity="0.8" />
+            <circle cx="144.3" cy="125.5" r="4" fill="var(--ink-soft)" opacity="0.8" />
+            <circle cx="72.0" cy="63.4" r="4" fill="var(--ink-soft)" opacity="0.8" />
+            <circle cx="181.6" cy="59.7" r="4" fill="var(--ink-soft)" opacity="0.8" />
+            <circle cx="146.1" cy="138.2" r="4" fill="var(--ink-soft)" opacity="0.8" />
+            <circle cx="87.8" cy="56.3" r="4" fill="var(--ink-soft)" opacity="0.8" />
+            <circle cx="184.9" cy="55.5" r="4" fill="var(--ink-soft)" opacity="0.8" />
+            <circle cx="142.1" cy="141.0" r="4" fill="var(--ink-soft)" opacity="0.8" />
+            <circle cx="81.6" cy="69.8" r="4" fill="var(--ink-soft)" opacity="0.8" />
+            <circle cx="184.9" cy="53.7" r="4" fill="var(--ink-soft)" opacity="0.8" />
+            <circle cx="135.8" cy="131.7" r="4" fill="var(--ink-soft)" opacity="0.8" />
+            <circle cx="72.8" cy="64.3" r="4" fill="var(--ink-soft)" opacity="0.8" />
+            <circle cx="189.5" cy="55.9" r="4" fill="var(--ink-soft)" opacity="0.8" />
+            <circle cx="130.5" cy="135.0" r="4" fill="var(--ink-soft)" opacity="0.8" />
+            <circle cx="68.3" cy="62.9" r="4" fill="var(--ink-soft)" opacity="0.8" />
+            <circle cx="177.8" cy="56.9" r="4" fill="var(--ink-soft)" opacity="0.8" />
+            <circle cx="134.5" cy="127.2" r="4" fill="var(--ink-soft)" opacity="0.8" />
+            <circle cx="77.9" cy="63.8" r="4" fill="var(--ink-soft)" opacity="0.8" />
+            <circle cx="197.0" cy="48.2" r="4" fill="var(--ink-soft)" opacity="0.8" />
+            <circle cx="131.4" cy="132.0" r="4" fill="var(--ink-soft)" opacity="0.8" />
+            <circle cx="81.2" cy="60.8" r="4" fill="var(--ink-soft)" opacity="0.8" />
+            <circle cx="199.8" cy="45.7" r="4" fill="var(--ink-soft)" opacity="0.8" />
+            <circle cx="131.3" cy="132.8" r="4" fill="var(--ink-soft)" opacity="0.8" />
+            <circle cx="37.6" cy="102.5" r="7" fill="var(--surface)" stroke="var(--c1)" stroke-width="2.4" /><circle cx="37.6" cy="102.5" r="2.2" fill="var(--c1)" />
+            <circle cx="147.6" cy="29.0" r="7" fill="var(--surface)" stroke="var(--c2)" stroke-width="2.4" /><circle cx="147.6" cy="29.0" r="2.2" fill="var(--c2)" />
+            <circle cx="191.6" cy="152.0" r="7" fill="var(--surface)" stroke="var(--c3)" stroke-width="2.4" /><circle cx="191.6" cy="152.0" r="2.2" fill="var(--c3)" />
+          </svg>
+          <p class="fase-titulo"><span class="fase-num">1</span>inicialización</p>
+          <p class="caption">
+            Se colocan <em>k</em> centroides de partida (aquí k = 3), sin
+            información sobre los grupos reales.
+          </p>
         </div>
-        <button class="btn" data-action="regen">otra muestra</button>
-        <label class="field">
-          k = <output data-out="k">3</output>
-          <input type="range" min="2" max="6" step="1" value="3" data-in="k" aria-label="número de grupos k" />
-        </label>
-      </div>
-      <div class="canvas-wrap">
-        <canvas aria-label="Sandbox interactivo de K-Means: los puntos se agrupan alrededor de los centroides"></canvas>
-        <p class="hint" data-hint>arrastra puntos o centroides · clic para añadir un punto</p>
-      </div>
-      <div class="controls timeline">
-        <button class="btn btn-primary" data-action="play">reproducir</button>
-        <button class="btn arrow" data-action="back" aria-label="fase anterior">←</button>
-        <input
-          type="range"
-          min="0"
-          max="0"
-          step="1"
-          value="0"
-          data-in="pos"
-          aria-label="posición en la ejecución (también responde a las flechas del teclado)"
-        />
-        <button class="btn arrow" data-action="step" aria-label="fase siguiente">→</button>
-        <output class="caption" data-out="pos-label">paso 0 de 0</output>
-        <button class="btn" data-action="reset">reiniciar</button>
-      </div>
-      <div class="narration-box">
-        <span class="phase-chip" data-out="phase">inicio</span>
-        <p class="narration" data-out="narration">·</p>
-      </div>
-      <dl class="metrics">
-        <div class="metric">
-          <dt>iteración</dt>
-          <dd data-out="iteration">0</dd>
+        <div class="flecha" aria-hidden="true">→</div>
+        <div class="fase">
+          <svg
+            viewBox="0 0 260 190"
+            role="img"
+            aria-label="Fase de asignación: cada punto toma el color del centroide más cercano y una línea fina lo une con él"
+          >
+            <line x1="82.1" y1="55.1" x2="147.6" y2="29.0" stroke="var(--c2)" stroke-width="0.8" opacity="0.3" />
+            <line x1="174.1" y1="61.4" x2="147.6" y2="29.0" stroke="var(--c2)" stroke-width="0.8" opacity="0.3" />
+            <line x1="140.3" y1="141.2" x2="191.6" y2="152.0" stroke="var(--c3)" stroke-width="0.8" opacity="0.3" />
+            <line x1="72.7" y1="69.1" x2="37.6" y2="102.5" stroke="var(--c1)" stroke-width="0.8" opacity="0.3" />
+            <line x1="190.2" y1="53.8" x2="147.6" y2="29.0" stroke="var(--c2)" stroke-width="0.8" opacity="0.3" />
+            <line x1="144.3" y1="125.5" x2="191.6" y2="152.0" stroke="var(--c3)" stroke-width="0.8" opacity="0.3" />
+            <line x1="72.0" y1="63.4" x2="37.6" y2="102.5" stroke="var(--c1)" stroke-width="0.8" opacity="0.3" />
+            <line x1="181.6" y1="59.7" x2="147.6" y2="29.0" stroke="var(--c2)" stroke-width="0.8" opacity="0.3" />
+            <line x1="146.1" y1="138.2" x2="191.6" y2="152.0" stroke="var(--c3)" stroke-width="0.8" opacity="0.3" />
+            <line x1="87.8" y1="56.3" x2="147.6" y2="29.0" stroke="var(--c2)" stroke-width="0.8" opacity="0.3" />
+            <line x1="184.9" y1="55.5" x2="147.6" y2="29.0" stroke="var(--c2)" stroke-width="0.8" opacity="0.3" />
+            <line x1="142.1" y1="141.0" x2="191.6" y2="152.0" stroke="var(--c3)" stroke-width="0.8" opacity="0.3" />
+            <line x1="81.6" y1="69.8" x2="37.6" y2="102.5" stroke="var(--c1)" stroke-width="0.8" opacity="0.3" />
+            <line x1="184.9" y1="53.7" x2="147.6" y2="29.0" stroke="var(--c2)" stroke-width="0.8" opacity="0.3" />
+            <line x1="135.8" y1="131.7" x2="191.6" y2="152.0" stroke="var(--c3)" stroke-width="0.8" opacity="0.3" />
+            <line x1="72.8" y1="64.3" x2="37.6" y2="102.5" stroke="var(--c1)" stroke-width="0.8" opacity="0.3" />
+            <line x1="189.5" y1="55.9" x2="147.6" y2="29.0" stroke="var(--c2)" stroke-width="0.8" opacity="0.3" />
+            <line x1="130.5" y1="135.0" x2="191.6" y2="152.0" stroke="var(--c3)" stroke-width="0.8" opacity="0.3" />
+            <line x1="68.3" y1="62.9" x2="37.6" y2="102.5" stroke="var(--c1)" stroke-width="0.8" opacity="0.3" />
+            <line x1="177.8" y1="56.9" x2="147.6" y2="29.0" stroke="var(--c2)" stroke-width="0.8" opacity="0.3" />
+            <line x1="134.5" y1="127.2" x2="191.6" y2="152.0" stroke="var(--c3)" stroke-width="0.8" opacity="0.3" />
+            <line x1="77.9" y1="63.8" x2="37.6" y2="102.5" stroke="var(--c1)" stroke-width="0.8" opacity="0.3" />
+            <line x1="197.0" y1="48.2" x2="147.6" y2="29.0" stroke="var(--c2)" stroke-width="0.8" opacity="0.3" />
+            <line x1="131.4" y1="132.0" x2="191.6" y2="152.0" stroke="var(--c3)" stroke-width="0.8" opacity="0.3" />
+            <line x1="81.2" y1="60.8" x2="37.6" y2="102.5" stroke="var(--c1)" stroke-width="0.8" opacity="0.3" />
+            <line x1="199.8" y1="45.7" x2="147.6" y2="29.0" stroke="var(--c2)" stroke-width="0.8" opacity="0.3" />
+            <line x1="131.3" y1="132.8" x2="191.6" y2="152.0" stroke="var(--c3)" stroke-width="0.8" opacity="0.3" />
+            <circle cx="82.1" cy="55.1" r="4" fill="var(--c2)" opacity="0.8" />
+            <circle cx="174.1" cy="61.4" r="4" fill="var(--c2)" opacity="0.8" />
+            <circle cx="140.3" cy="141.2" r="4" fill="var(--c3)" opacity="0.8" />
+            <circle cx="72.7" cy="69.1" r="4" fill="var(--c1)" opacity="0.8" />
+            <circle cx="190.2" cy="53.8" r="4" fill="var(--c2)" opacity="0.8" />
+            <circle cx="144.3" cy="125.5" r="4" fill="var(--c3)" opacity="0.8" />
+            <circle cx="72.0" cy="63.4" r="4" fill="var(--c1)" opacity="0.8" />
+            <circle cx="181.6" cy="59.7" r="4" fill="var(--c2)" opacity="0.8" />
+            <circle cx="146.1" cy="138.2" r="4" fill="var(--c3)" opacity="0.8" />
+            <circle cx="87.8" cy="56.3" r="4" fill="var(--c2)" opacity="0.8" />
+            <circle cx="184.9" cy="55.5" r="4" fill="var(--c2)" opacity="0.8" />
+            <circle cx="142.1" cy="141.0" r="4" fill="var(--c3)" opacity="0.8" />
+            <circle cx="81.6" cy="69.8" r="4" fill="var(--c1)" opacity="0.8" />
+            <circle cx="184.9" cy="53.7" r="4" fill="var(--c2)" opacity="0.8" />
+            <circle cx="135.8" cy="131.7" r="4" fill="var(--c3)" opacity="0.8" />
+            <circle cx="72.8" cy="64.3" r="4" fill="var(--c1)" opacity="0.8" />
+            <circle cx="189.5" cy="55.9" r="4" fill="var(--c2)" opacity="0.8" />
+            <circle cx="130.5" cy="135.0" r="4" fill="var(--c3)" opacity="0.8" />
+            <circle cx="68.3" cy="62.9" r="4" fill="var(--c1)" opacity="0.8" />
+            <circle cx="177.8" cy="56.9" r="4" fill="var(--c2)" opacity="0.8" />
+            <circle cx="134.5" cy="127.2" r="4" fill="var(--c3)" opacity="0.8" />
+            <circle cx="77.9" cy="63.8" r="4" fill="var(--c1)" opacity="0.8" />
+            <circle cx="197.0" cy="48.2" r="4" fill="var(--c2)" opacity="0.8" />
+            <circle cx="131.4" cy="132.0" r="4" fill="var(--c3)" opacity="0.8" />
+            <circle cx="81.2" cy="60.8" r="4" fill="var(--c1)" opacity="0.8" />
+            <circle cx="199.8" cy="45.7" r="4" fill="var(--c2)" opacity="0.8" />
+            <circle cx="131.3" cy="132.8" r="4" fill="var(--c3)" opacity="0.8" />
+            <circle cx="37.6" cy="102.5" r="7" fill="var(--surface)" stroke="var(--c1)" stroke-width="2.4" /><circle cx="37.6" cy="102.5" r="2.2" fill="var(--c1)" />
+            <circle cx="147.6" cy="29.0" r="7" fill="var(--surface)" stroke="var(--c2)" stroke-width="2.4" /><circle cx="147.6" cy="29.0" r="2.2" fill="var(--c2)" />
+            <circle cx="191.6" cy="152.0" r="7" fill="var(--surface)" stroke="var(--c3)" stroke-width="2.4" /><circle cx="191.6" cy="152.0" r="2.2" fill="var(--c3)" />
+          </svg>
+          <p class="fase-titulo"><span class="fase-num">2</span>asignación</p>
+          <p class="caption">
+            Cada punto se asigna al centroide más cercano y toma su color; las
+            líneas muestran la asignación.
+          </p>
         </div>
-        <div class="metric">
-          <dt>Inercia</dt>
-          <dd data-out="inertia">·</dd>
+        <div class="flecha" aria-hidden="true">→</div>
+        <div class="fase">
+          <svg
+            viewBox="0 0 260 190"
+            role="img"
+            aria-label="Fase de actualización: cada centroide se desplaza hasta la media de sus puntos asignados; la posición anterior queda marcada en claro"
+          >
+            <circle cx="37.6" cy="102.5" r="7" fill="none" stroke="var(--c1)" stroke-width="1.4" opacity="0.35" />
+            <circle cx="147.6" cy="29.0" r="7" fill="none" stroke="var(--c2)" stroke-width="1.4" opacity="0.35" />
+            <circle cx="191.6" cy="152.0" r="7" fill="none" stroke="var(--c3)" stroke-width="1.4" opacity="0.35" />
+            <line x1="37.6" y1="102.5" x2="75.2" y2="64.9" stroke="var(--c1)" stroke-width="1.6" stroke-dasharray="4 3" opacity="0.85" />
+            <line x1="147.6" y1="29.0" x2="168.1" y2="54.7" stroke="var(--c2)" stroke-width="1.6" stroke-dasharray="4 3" opacity="0.85" />
+            <line x1="191.6" y1="152.0" x2="137.4" y2="133.8" stroke="var(--c3)" stroke-width="1.6" stroke-dasharray="4 3" opacity="0.85" />
+            <circle cx="82.1" cy="55.1" r="4" fill="var(--c2)" opacity="0.8" />
+            <circle cx="174.1" cy="61.4" r="4" fill="var(--c2)" opacity="0.8" />
+            <circle cx="140.3" cy="141.2" r="4" fill="var(--c3)" opacity="0.8" />
+            <circle cx="72.7" cy="69.1" r="4" fill="var(--c1)" opacity="0.8" />
+            <circle cx="190.2" cy="53.8" r="4" fill="var(--c2)" opacity="0.8" />
+            <circle cx="144.3" cy="125.5" r="4" fill="var(--c3)" opacity="0.8" />
+            <circle cx="72.0" cy="63.4" r="4" fill="var(--c1)" opacity="0.8" />
+            <circle cx="181.6" cy="59.7" r="4" fill="var(--c2)" opacity="0.8" />
+            <circle cx="146.1" cy="138.2" r="4" fill="var(--c3)" opacity="0.8" />
+            <circle cx="87.8" cy="56.3" r="4" fill="var(--c2)" opacity="0.8" />
+            <circle cx="184.9" cy="55.5" r="4" fill="var(--c2)" opacity="0.8" />
+            <circle cx="142.1" cy="141.0" r="4" fill="var(--c3)" opacity="0.8" />
+            <circle cx="81.6" cy="69.8" r="4" fill="var(--c1)" opacity="0.8" />
+            <circle cx="184.9" cy="53.7" r="4" fill="var(--c2)" opacity="0.8" />
+            <circle cx="135.8" cy="131.7" r="4" fill="var(--c3)" opacity="0.8" />
+            <circle cx="72.8" cy="64.3" r="4" fill="var(--c1)" opacity="0.8" />
+            <circle cx="189.5" cy="55.9" r="4" fill="var(--c2)" opacity="0.8" />
+            <circle cx="130.5" cy="135.0" r="4" fill="var(--c3)" opacity="0.8" />
+            <circle cx="68.3" cy="62.9" r="4" fill="var(--c1)" opacity="0.8" />
+            <circle cx="177.8" cy="56.9" r="4" fill="var(--c2)" opacity="0.8" />
+            <circle cx="134.5" cy="127.2" r="4" fill="var(--c3)" opacity="0.8" />
+            <circle cx="77.9" cy="63.8" r="4" fill="var(--c1)" opacity="0.8" />
+            <circle cx="197.0" cy="48.2" r="4" fill="var(--c2)" opacity="0.8" />
+            <circle cx="131.4" cy="132.0" r="4" fill="var(--c3)" opacity="0.8" />
+            <circle cx="81.2" cy="60.8" r="4" fill="var(--c1)" opacity="0.8" />
+            <circle cx="199.8" cy="45.7" r="4" fill="var(--c2)" opacity="0.8" />
+            <circle cx="131.3" cy="132.8" r="4" fill="var(--c3)" opacity="0.8" />
+            <circle cx="75.2" cy="64.9" r="7" fill="var(--surface)" stroke="var(--c1)" stroke-width="2.4" /><circle cx="75.2" cy="64.9" r="2.2" fill="var(--c1)" />
+            <circle cx="168.1" cy="54.7" r="7" fill="var(--surface)" stroke="var(--c2)" stroke-width="2.4" /><circle cx="168.1" cy="54.7" r="2.2" fill="var(--c2)" />
+            <circle cx="137.4" cy="133.8" r="7" fill="var(--surface)" stroke="var(--c3)" stroke-width="2.4" /><circle cx="137.4" cy="133.8" r="2.2" fill="var(--c3)" />
+          </svg>
+          <p class="fase-titulo"><span class="fase-num">3</span>actualización</p>
+          <p class="caption">
+            Cada centroide se desplaza a la media de sus puntos asignados; su
+            posición anterior queda en claro.
+          </p>
         </div>
-        <div class="metric">
-          <dt>estado</dt>
-          <dd data-out="status">listo</dd>
-        </div>
-      </dl>
-    </div>
+      </div>
+      <figcaption class="caption ciclo-nota">
+        Las fases 2 y 3 se repiten en bucle. Cuando el desplazamiento de los
+        centroides queda por debajo de una tolerancia, el algoritmo ha
+        convergido: cada punto pertenece al clúster de su centroide más
+        cercano. En el diagrama, los grupos verdaderos aún no coinciden con la
+        asignación; harán falta más iteraciones.
+      </figcaption>
+    </figure>
   </div>
 </section>
 
 <style>
+  /* el texto acompaña al diagrama: misma columna, alineado a su borde */
+  .intro {
+    max-width: 860px;
+    margin-inline: auto;
+    padding-inline: 24px;
+    margin-block-end: 48px;
+  }
+
+  .intro p {
+    max-width: 70ch;
+  }
+
+  .ciclo {
+    margin: 0;
+  }
+
+  .fases {
+    display: grid;
+    grid-template-columns: 1fr auto 1fr auto 1fr;
+    gap: 14px;
+    align-items: stretch;
+  }
+
+  .fase {
+    background: var(--surface);
+    border: 1px solid var(--line);
+    padding: 14px 16px 12px;
+  }
+
+  .fase svg {
+    display: block;
+    width: 100%;
+    height: auto;
+  }
+
+  .fase-titulo {
+    margin: 12px 0 4px;
+    font-weight: 650;
+    font-size: 0.95rem;
+  }
+
+  .fase-num {
+    display: inline-block;
+    margin-right: 8px;
+    padding: 0 7px;
+    border: 1px solid var(--accent);
+    color: var(--accent);
+    font-size: 0.75rem;
+    font-variant-numeric: tabular-nums;
+  }
+
+  .fase .caption {
+    margin: 0;
+  }
+
+  .flecha {
+    align-self: center;
+    color: var(--ink-soft);
+    font-size: 1.3rem;
+  }
+
+  .ciclo-nota {
+    margin-block-start: 16px;
+    max-width: 78ch;
+  }
+
+  @media (max-width: 720px) {
+    .fases {
+      grid-template-columns: 1fr;
+    }
+
+    .flecha {
+      justify-self: center;
+      rotate: 90deg;
+    }
+  }
 </style>
-
-<script>
-  import { Lloyd } from '../../lib/algorithms/lloyd.ts';
-  import { inertia, mulberry32 } from '../../lib/algorithms/kmeans-base.ts';
-  import type { Point } from '../../lib/algorithms/types.ts';
-  import { blobs, anisotropic, unevenDensities, moons } from '../../lib/data/datasets.ts';
-  import { CanvasRenderer } from '../../lib/sim/renderer.ts';
-
-  const root = document.getElementById('fundamento')!;
-  const canvas = root.querySelector('canvas')!;
-  const out = (n: string) => root.querySelector<HTMLElement>(`[data-out="${n}"]`)!;
-  const btn = (a: string) => root.querySelector<HTMLButtonElement>(`[data-action="${a}"]`)!;
-  const hint = root.querySelector<HTMLElement>('[data-hint]')!;
-  const posInput = root.querySelector<HTMLInputElement>('[data-in="pos"]')!;
-  const kInput = root.querySelector<HTMLInputElement>('[data-in="k"]')!;
-
-  const SHAPES: Record<string, (seed: number, n: number) => Point[]> = {
-    redondos: blobs,
-    alargados: anisotropic,
-    desiguales: unevenDensities,
-    lunas: moons,
-  };
-
-  const seed = 7;
-  let shape = 'redondos';
-  let dataSeed = 21;
-  let k = 3;
-  let points: Point[] = SHAPES[shape]!(dataSeed, 150);
-
-  const lloyd = new Lloyd();
-  const renderer = new CanvasRenderer(canvas);
-  const accent =
-    getComputedStyle(canvas).getPropertyValue('--accent').trim() || '#2D5BFF';
-
-  // ---- historial: cada fase de cada iteración es un fotograma ----
-  type Phase = 'inicio' | 'asignacion' | 'actualizacion';
-  const PHASE_LABEL: Record<Phase, string> = {
-    inicio: 'inicio',
-    asignacion: 'asignación',
-    actualizacion: 'actualización',
-  };
-  interface Snap {
-    labels: number[];
-    centroids: Point[];
-    iteration: number;
-    distanceComputations: number;
-    inertia: number;
-    converged: boolean;
-    phase: Phase;
-    changed: number[]; // puntos que cambiaron de grupo (fase de asignación)
-    moved: number; // desplazamiento máximo de centroide (fase de actualización)
-  }
-  let history: Snap[] = [];
-  let pos = 0;
-
-  const fromLloyd = (phase: Phase, changed: number[], moved: number): Snap => ({
-    labels: [...lloyd.labels],
-    centroids: lloyd.centroids.map((c) => ({ ...c })),
-    iteration: lloyd.metrics.iteration,
-    distanceComputations: lloyd.metrics.distanceComputations,
-    inertia: lloyd.metrics.inertia,
-    converged: lloyd.converged,
-    phase,
-    changed,
-    moved,
-  });
-
-  /** Devuelve el algoritmo al estado de un fotograma (para ramificar desde él). */
-  const restore = (s: Snap) => {
-    lloyd.labels = [...s.labels];
-    lloyd.centroids = s.centroids.map((c) => ({ ...c }));
-    lloyd.metrics = {
-      iteration: s.iteration,
-      distanceComputations: s.distanceComputations,
-      inertia: s.inertia,
-    };
-    lloyd.converged = s.converged;
-  };
-
-  const current = () => history[pos]!;
-  const last = () => history[history.length - 1]!;
-
-  /** Calcula una iteración nueva y la guarda como dos fotogramas (fases). */
-  function computeIteration() {
-    const prevLabels = [...lloyd.labels];
-    const oldCentroids = lloyd.centroids.map((c) => ({ ...c }));
-    lloyd.step();
-    // en la primera asignación nadie "cambia" de grupo: todos lo estrenan
-    const changed: number[] = [];
-    lloyd.labels.forEach((l, i) => {
-      if (prevLabels[i] !== undefined && prevLabels[i]! >= 0 && l !== prevLabels[i]) changed.push(i);
-    });
-    let moved = 0;
-    lloyd.centroids.forEach((c, j) => {
-      const o = oldCentroids[j]!;
-      moved = Math.max(moved, Math.hypot(c.x - o.x, c.y - o.y));
-    });
-    // fase A: los puntos ya eligieron, los centroides aún no se han movido
-    history.push({
-      labels: [...lloyd.labels],
-      centroids: oldCentroids,
-      iteration: lloyd.metrics.iteration,
-      distanceComputations: lloyd.metrics.distanceComputations,
-      inertia: inertia(points, oldCentroids, lloyd.labels),
-      converged: false,
-      phase: 'asignacion',
-      changed,
-      moved: 0,
-    });
-    // fase B: los centroides saltan a la media de su grupo
-    history.push(fromLloyd('actualizacion', [], moved));
-  }
-
-  function narration(): string {
-    const s = current();
-    if (s.phase === 'inicio') {
-      return (
-        `${s.centroids.length} centroides colocados al azar, todavía sin puntos ` +
-        `asignados. La ejecución completa tiene ${history.length - 1} pasos: ` +
-        'recórrela con las flechas o pulsa reproducir.'
-      );
-    }
-    if (s.phase === 'asignacion') {
-      if (s.iteration === 1) {
-        return 'Cada punto se apunta al centroide más cercano y recibe su primer color. Los centroides todavía no se han movido.';
-      }
-      const n = s.changed.length;
-      return (
-        'Cada punto vuelve a elegir el centroide más cercano. ' +
-        (n === 0
-          ? 'Ningún punto cambia de grupo: la partición ya es estable.'
-          : n === 1
-            ? '1 punto cambia de grupo (marcado con un aro).'
-            : `${n} puntos cambian de grupo (marcados con un aro).`)
-      );
-    }
-    const conv = s.converged
-      ? ' El movimiento queda por debajo de la tolerancia: <strong>convergido</strong>.'
-      : '';
-    return (
-      'Cada centroide salta a la media de los puntos que lo eligieron ' +
-      `(desplazamiento máximo ${s.moved.toFixed(3)}).` +
-      conv
-    );
-  }
-
-  function display(animate = true) {
-    const s = current();
-    renderer.setState({ points, labels: s.labels, centroids: s.centroids }, animate);
-    const total = history.length - 1;
-    posInput.max = String(total);
-    posInput.value = String(pos);
-    posInput.style.setProperty('--p', `${total > 0 ? (pos / total) * 100 : 0}%`);
-    out('pos-label').textContent = `paso ${pos} de ${total}`;
-    out('phase').textContent =
-      s.phase === 'actualizacion' || s.phase === 'asignacion'
-        ? `iteración ${s.iteration} · ${PHASE_LABEL[s.phase]}`
-        : PHASE_LABEL[s.phase];
-    out('narration').innerHTML = narration();
-    out('iteration').textContent = String(s.iteration);
-    out('inertia').textContent = Number.isNaN(s.inertia) ? '·' : s.inertia.toFixed(3);
-    out('status').textContent =
-      s.converged && pos === history.length - 1
-        ? 'convergido'
-        : playing
-          ? 'en marcha'
-          : pos === 0 && s.phase === 'inicio'
-            ? 'listo'
-            : pos < history.length - 1
-              ? 'repasando'
-              : 'pausado';
-    const atEnd = pos === history.length - 1 && last().converged;
-    btn('play').textContent = playing ? 'pausar' : 'reproducir';
-    btn('play').disabled = atEnd;
-    btn('step').disabled = atEnd;
-    btn('back').disabled = pos === 0;
-  }
-
-  /** Calcula la ejecución completa desde el estado actual del algoritmo. */
-  function computeRun() {
-    let guard = 0;
-    while (!lloyd.converged && guard++ < 120) computeIteration();
-  }
-
-  /** Avanza un fotograma por la ejecución ya calculada. */
-  function forward(animate = true): boolean {
-    if (pos >= history.length - 1) return false;
-    pos++;
-    display(animate);
-    return true;
-  }
-
-  function back() {
-    if (pos === 0) return;
-    pos--;
-    display();
-  }
-
-  // ---- reproducir ----
-  let playing = false;
-  let timer: ReturnType<typeof setTimeout> | null = null;
-
-  function stopPlay() {
-    playing = false;
-    if (timer) clearTimeout(timer);
-    timer = null;
-  }
-
-  function play() {
-    if (playing) return;
-    playing = true;
-    const loop = () => {
-      if (!playing) return;
-      if (forward()) timer = setTimeout(loop, 650);
-      else stopPlay();
-      display();
-    };
-    loop();
-  }
-
-  function reinit() {
-    stopPlay();
-    lloyd.init(points, k, seed + dataSeed);
-    // arranque aleatorio y reproducible: lejos de su sitio, para que el ciclo
-    // tenga recorrido y se vea trabajar (k-means++ acierta demasiado)
-    const rand = mulberry32((seed + dataSeed) * 9973 + k);
-    for (let j = 0; j < lloyd.centroids.length; j++) {
-      lloyd.centroids[j] = { x: 0.08 + rand() * 0.84, y: 0.08 + rand() * 0.84 };
-    }
-    history = [fromLloyd('inicio', [], 0)];
-    pos = 0;
-    // la ejecución entera se calcula ya: la línea de tiempo siempre está completa
-    computeRun();
-    display(false);
-  }
-
-  // ---- controles ----
-  btn('play').addEventListener('click', () => {
-    if (playing) {
-      stopPlay();
-      display();
-    } else {
-      play();
-    }
-  });
-  btn('step').addEventListener('click', () => {
-    stopPlay();
-    forward();
-  });
-  btn('back').addEventListener('click', () => {
-    stopPlay();
-    back();
-  });
-  btn('reset').addEventListener('click', reinit);
-  btn('regen').addEventListener('click', () => {
-    dataSeed++;
-    points = SHAPES[shape]!(dataSeed, 150);
-    reinit();
-  });
-
-  posInput.addEventListener('input', () => {
-    stopPlay();
-    pos = Number(posInput.value);
-    display(false);
-  });
-
-  kInput.addEventListener('input', () => {
-    k = Number(kInput.value);
-    out('k').textContent = kInput.value;
-    reinit();
-  });
-
-  for (const b of root.querySelectorAll<HTMLButtonElement>('.seg-btn')) {
-    b.addEventListener('click', () => {
-      shape = b.dataset.shape!;
-      for (const other of root.querySelectorAll('.seg-btn')) {
-        other.setAttribute('aria-pressed', String(other === b));
-      }
-      points = SHAPES[shape]!(dataSeed, 150);
-      reinit();
-    });
-  }
-
-  // flechas del teclado: funcionan siempre que la sección esté a la vista,
-  // sin necesidad de enfocar la barra
-  let inView = false;
-  new IntersectionObserver(
-    (entries) => {
-      for (const e of entries) inView = e.isIntersecting;
-    },
-    { threshold: 0.25 },
-  ).observe(root);
-
-  document.addEventListener('keydown', (ev) => {
-    if (!inView || (ev.key !== 'ArrowLeft' && ev.key !== 'ArrowRight')) return;
-    const t = ev.target as HTMLElement;
-    // no interceptar otros controles (p. ej. el deslizador de k)
-    if (t instanceof HTMLInputElement && t !== posInput) return;
-    ev.preventDefault();
-    stopPlay();
-    if (ev.key === 'ArrowRight') forward();
-    else back();
-  });
-
-  // ---- interacción con el lienzo: centroides primero, luego puntos ----
-  const clamp01 = (v: number) => Math.min(0.98, Math.max(0.02, v));
-  let dragCentroid = -1;
-  let dragPoint = -1;
-  let hoverCentroid = -1;
-
-  const hitCentroid = (p: Point) => {
-    const tol = renderer.pxToData(14);
-    let best = -1;
-    let bestD = tol * tol;
-    current().centroids.forEach((c, j) => {
-      const d = (c.x - p.x) ** 2 + (c.y - p.y) ** 2;
-      if (d < bestD) {
-        bestD = d;
-        best = j;
-      }
-    });
-    return best;
-  };
-
-  const hitPoint = (p: Point) => {
-    const tol = renderer.pxToData(11);
-    let best = -1;
-    let bestD = tol * tol;
-    points.forEach((q, i) => {
-      const d = (q.x - p.x) ** 2 + (q.y - p.y) ** 2;
-      if (d < bestD) {
-        bestD = d;
-        best = i;
-      }
-    });
-    return best;
-  };
-
-  // capa de dibujo extra: aros en los puntos que cambian + resalte del
-  // centroide bajo el ratón
-  renderer.setOverlay((ctx, map) => {
-    const s = current();
-    if (s.phase === 'asignacion' && s.changed.length > 0) {
-      ctx.lineWidth = 1.2;
-      ctx.strokeStyle = 'rgb(26 26 26 / 0.55)';
-      for (const i of s.changed) {
-        const q = points[i];
-        if (!q) continue;
-        ctx.beginPath();
-        ctx.arc(map.x(q.x), map.y(q.y), 6.5, 0, Math.PI * 2);
-        ctx.stroke();
-      }
-    }
-    if (hoverCentroid >= 0) {
-      const c = s.centroids[hoverCentroid];
-      if (c) {
-        ctx.beginPath();
-        ctx.arc(map.x(c.x), map.y(c.y), 13, 0, Math.PI * 2);
-        ctx.lineWidth = 2;
-        ctx.strokeStyle = accent;
-        ctx.stroke();
-      }
-    }
-  });
-
-  function setHoverCentroid(j: number) {
-    if (j === hoverCentroid) return;
-    hoverCentroid = j;
-    display(false); // repinta con o sin anillo
-  }
-
-  canvas.addEventListener('pointerdown', (ev) => {
-    hint.classList.add('is-hidden');
-    stopPlay();
-    const p = renderer.eventToData(ev);
-    const cIdx = hitCentroid(p);
-    if (cIdx >= 0) {
-      // agarrar un centroide abre una rama nueva desde el fotograma visible
-      restore(current());
-      history = history.slice(0, pos + 1);
-      dragCentroid = cIdx;
-      canvas.style.cursor = 'grabbing';
-      canvas.setPointerCapture(ev.pointerId);
-      return;
-    }
-    const pIdx = hitPoint(p);
-    if (pIdx >= 0) {
-      dragPoint = pIdx;
-      canvas.style.cursor = 'grabbing';
-      canvas.setPointerCapture(ev.pointerId);
-    } else {
-      points.push({ x: clamp01(p.x), y: clamp01(p.y) });
-      reinit();
-    }
-  });
-
-  canvas.addEventListener('pointermove', (ev) => {
-    const p = renderer.eventToData(ev);
-    if (dragCentroid >= 0) {
-      lloyd.centroids[dragCentroid] = { x: clamp01(p.x), y: clamp01(p.y) };
-      lloyd.converged = false;
-      lloyd.metrics.inertia = inertia(points, lloyd.centroids, lloyd.labels);
-      history[pos] = fromLloyd(current().phase, [], 0);
-      display(false);
-      return;
-    }
-    if (dragPoint >= 0) {
-      points[dragPoint] = { x: clamp01(p.x), y: clamp01(p.y) };
-      display(false);
-      return;
-    }
-    const cIdx = hitCentroid(p);
-    setHoverCentroid(cIdx);
-    canvas.style.cursor = cIdx >= 0 || hitPoint(p) >= 0 ? 'grab' : 'crosshair';
-  });
-
-  canvas.addEventListener('pointerup', () => {
-    if (dragCentroid >= 0) {
-      dragCentroid = -1;
-      canvas.style.cursor = 'grab';
-      // el futuro de la rama nueva se calcula entero desde el centroide movido
-      computeRun();
-      display();
-      return;
-    }
-    if (dragPoint >= 0) {
-      dragPoint = -1;
-      canvas.style.cursor = 'grab';
-      reinit(); // los datos cambiaron: la ejecución empieza de cero
-    }
-  });
-
-  canvas.addEventListener('pointerleave', () => setHoverCentroid(-1));
-  canvas.style.cursor = 'crosshair';
-
-  // pausa la simulación cuando el navegador deja de renderizar la sección
-  root.addEventListener('contentvisibilityautostatechange', (ev) => {
-    if ((ev as ContentVisibilityAutoStateChangeEvent).skipped) {
-      stopPlay();
-      display();
-    }
-  });
-
-  // pequeño asidero para verificación end-to-end
-  (window as unknown as Record<string, unknown>).__labFundamento = {
-    centroids: () => current().centroids.map((c) => ({ ...c })),
-    pos: () => pos,
-    length: () => history.length,
-    phase: () => current().phase,
-    pad: 20,
-  };
-
-  reinit();
-</script>

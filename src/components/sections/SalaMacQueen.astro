@@ -1,27 +1,31 @@
 ---
 /**
- * Sala 2.2 — MacQueen, el modo online. Los puntos entran de uno en uno y el
- * centroide afectado se desplaza al instante. "Barajar orden" demuestra la
- * sensibilidad al orden de llegada, algo que a Lloyd no le pasa.
+ * Sala 2.2 — MacQueen: K-Means secuencial. Los puntos se procesan de
+ * uno en uno y el centroide afectado se recalcula al instante. "Barajar orden"
+ * demuestra la sensibilidad al orden de llegada, que Lloyd no tiene.
  */
 ---
 
 <section class="section" id="sala-macqueen" aria-labelledby="macqueen-titulo">
   <div class="prose reveal">
-    <h2 id="macqueen-titulo">MacQueen, el modo online</h2>
+    <h2 id="macqueen-titulo">MacQueen: K-Means secuencial</h2>
     <p>
-      MacQueen no espera a nadie: procesa los puntos <strong>uno a uno</strong>
-      y, en cuanto un punto se une a un grupo, ese centroide se recalcula
-      <em>al instante</em> (media incremental). Por eso es ideal para datos que
-      llegan en <strong>flujo continuo</strong>.
+      Cuando Lloyd reasigna los puntos no actualiza los centroides hasta
+      terminar el lote, así que un punto puede quedar asignado a un centroide
+      que ya no representa a su grupo. MacQueen corrige ese problema procesando
+      los puntos <strong>de uno en uno</strong>: en cuanto un punto se asigna a
+      un clúster, ese centroide se recalcula al instante mediante la
+      <em>media incremental</em>. Esto supone más tiempo de cálculo por
+      iteración, pero al ajustarse sobre la marcha suele converger en menos
+      pasadas y se adapta bien a datos que llegan en
+      <strong>flujo continuo</strong>.
     </p>
     <p>
-      Haz clic en el lienzo: cada punto que sueltes arrastra consigo a su
-      centroide al instante. También puedes arrastrar puntos o centroides existentes
-      para reconfigurar el agrupamiento. Y hay un precio: al decidir sobre la marcha, el
-      <strong>orden de llegada importa</strong>. Pulsa <em>barajar orden</em>
-      para rehacer el agrupamiento con los mismos datos en otro orden y puede
-      salir otra cosa. A Lloyd, que trabaja por lotes, eso no le pasa.
+      La contrapartida es que el <strong>orden de llegada importa</strong>:
+      procesar los mismos datos en otro orden puede producir un agrupamiento
+      distinto, algo que no ocurre con la actualización por lotes de Lloyd.
+      Activa <em>barajar orden</em> para comprobarlo con los mismos datos y la
+      misma inicialización.
     </p>
   </div>
 
@@ -29,9 +33,9 @@
     <div class="panel">
       <div class="controls toolbar">
         <div class="seg" role="group" aria-label="forma de los datos">
-          <button class="seg-btn" data-shape="redondos" aria-pressed="true">redondos</button>
+          <button class="seg-btn" data-shape="redondos" aria-pressed="false">redondos</button>
           <button class="seg-btn" data-shape="alargados" aria-pressed="false">alargados</button>
-          <button class="seg-btn" data-shape="desiguales" aria-pressed="false">desiguales</button>
+          <button class="seg-btn" data-shape="desiguales" aria-pressed="true">desiguales</button>
           <button class="seg-btn" data-shape="lunas" aria-pressed="false">lunas</button>
         </div>
         <button class="btn" data-action="regen">otra muestra</button>
@@ -71,7 +75,7 @@
           <dd data-out="count">0</dd>
         </div>
         <div class="metric">
-          <dt>Inercia</dt>
+          <dt>inercia (SSE)</dt>
           <dd data-out="inertia">·</dd>
         </div>
         <div class="metric">
@@ -271,14 +275,17 @@
     const s = current();
     if (s.phase === 'inicio') {
       return (
-        'Semillas de clúster colocadas. Pulsa <strong>reproducir</strong> o avanza con <strong>→</strong> ' +
-        'para ver la asignación online punto por punto.'
+        'Centroides inicializados con k-means++. Pulsa <strong>reproducir</strong> o avanza con <strong>→</strong> ' +
+        'para ver la asignación secuencial, punto por punto.'
       );
     }
     const colorIdx = s.labels[s.pointIndex]!;
+    const conv = s.converged
+      ? ' Ninguna asignación cambió en la pasada completa: <strong>convergido</strong>.'
+      : '';
     return (
-      `Procesando punto #${s.pointIndex + 1} (pasada ${s.iteration}). ` +
-      `Se asigna al clúster ${colorIdx + 1} e incrementa/desplaza su centroide de inmediato en vivo.`
+      `El punto ${s.pointIndex + 1} se asigna al clúster ${colorIdx + 1} y ese centroide ` +
+      `se recalcula al instante (media incremental).${conv}`
     );
   }
 
@@ -295,7 +302,11 @@
         ? `pasada ${s.iteration} · online`
         : 'inicio';
     out('narration').innerHTML = narration();
-    out('count').textContent = s.phase === 'ingesta' ? `${pos} / ${points.length}` : '0';
+    // posición dentro de la pasada actual, no del historial completo
+    out('count').textContent =
+      s.phase === 'ingesta'
+        ? `${((pos - 1) % points.length) + 1} / ${points.length}`
+        : `0 / ${points.length}`;
     out('inertia').textContent = Number.isNaN(s.inertia) ? '·' : s.inertia.toFixed(3);
 
     // Comparar veredicto con el orden original
@@ -304,7 +315,7 @@
     } else {
       const finalInertia = last().inertia;
       const diff = Math.abs(finalInertia - originalInertia);
-      out('verdict').textContent = diff < 1e-5 ? 'mismo resultado' : 'resultado diferente!';
+      out('verdict').textContent = diff < 1e-5 ? 'mismo resultado' : 'resultado distinto';
     }
 
     const atEnd = pos === history.length - 1 && last().converged;
@@ -340,13 +351,21 @@
   function play() {
     if (playing) return;
     playing = true;
+    // cadencia rápida (un punto cada 65 ms) medida por tiempo real, de modo
+    // que la duración total no depende del recorte de timers del navegador
+    let lastTick = performance.now();
     const loop = () => {
       if (!playing) return;
-      if (forward()) timer = setTimeout(loop, 120); // Faster stepping for point-by-point
-      else stopPlay();
+      const now = performance.now();
+      const steps = Math.max(1, Math.floor((now - lastTick) / 65));
+      lastTick = now;
+      pos = Math.min(history.length - 1, pos + steps);
+      display();
+      if (pos >= history.length - 1) stopPlay();
+      else timer = setTimeout(loop, 65);
       display();
     };
-    loop();
+    timer = setTimeout(loop, 65);
   }
 
   function reinit() {
@@ -519,14 +538,14 @@
       initialCentroidsOverride = history[0].centroids.map(c => ({ ...c }));
       dragCentroid = cIdx;
       canvas.style.cursor = 'grabbing';
-      canvas.setPointerCapture(ev.pointerId);
+      try { canvas.setPointerCapture(ev.pointerId); } catch { /* puntero sintético o ya liberado */ }
       return;
     }
     const pIdx = hitPoint(p);
     if (pIdx >= 0) {
       dragPoint = pIdx;
       canvas.style.cursor = 'grabbing';
-      canvas.setPointerCapture(ev.pointerId);
+      try { canvas.setPointerCapture(ev.pointerId); } catch { /* puntero sintético o ya liberado */ }
     } else {
       points.push({ x: clamp01(p.x), y: clamp01(p.y) });
       initialCentroidsOverride = null;

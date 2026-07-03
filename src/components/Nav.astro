@@ -5,14 +5,13 @@
  */
 const ITEMS = [
   ['apertura', 'inicio'],
-  ['fundamento', 'el fundamento'],
+  ['fundamento', 'la esencia'],
   ['sala-lloyd', 'lloyd'],
   ['sala-macqueen', 'macqueen'],
   ['sala-hartigan', 'hartigan-wong'],
   ['sala-elkan', 'elkan'],
-  ['sala-fuzzy', 'fuzzy'],
-  ['arena', 'la arena'],
-  ['guia', 'cuál elijo'],
+  ['sala-fuzzy', 'fuzzy c-means'],
+  ['guia', 'guía de decisión'],
 ];
 ---
 
@@ -88,22 +87,38 @@ const ITEMS = [
     [...nav.querySelectorAll<HTMLAnchorElement>('a')].map((a) => [a.dataset.target!, a]),
   );
 
-  // marca como actual la sección que ocupa la franja central del viewport
-  const spy = new IntersectionObserver(
-    (entries) => {
-      for (const e of entries) {
-        if (!e.isIntersecting) continue;
-        for (const a of links.values()) a.removeAttribute('aria-current');
-        links.get(e.target.id)?.setAttribute('aria-current', 'true');
-      }
-    },
-    { rootMargin: '-40% 0px -55% 0px' },
-  );
+  // marca como actual la sección que contiene el centro del viewport;
+  // se calcula por posición de scroll para que solo haya una activa
+  const sections = [...links.keys()]
+    .map((id) => document.getElementById(id))
+    .filter((el): el is HTMLElement => el !== null);
 
-  for (const id of links.keys()) {
-    const section = document.getElementById(id);
-    if (section) spy.observe(section);
+  function updateSpy() {
+    const middle = window.innerHeight * 0.45;
+    let active: string | null = null;
+    for (const el of sections) {
+      const r = el.getBoundingClientRect();
+      if (r.top <= middle && r.bottom > middle) {
+        active = el.id;
+        break;
+      }
+    }
+    // por debajo de la última sección, mantén la última como activa
+    if (!active && sections.length > 0) {
+      const lastEl = sections[sections.length - 1]!;
+      if (lastEl.getBoundingClientRect().bottom <= middle) active = lastEl.id;
+    }
+    for (const [id, a] of links) {
+      if (id === active) a.setAttribute('aria-current', 'true');
+      else a.removeAttribute('aria-current');
+    }
   }
+
+  // directo, sin rAF: son 9 rects por evento y así funciona también cuando
+  // el navegador pausa los frames (pestaña oculta)
+  addEventListener('scroll', updateSpy, { passive: true });
+  addEventListener('resize', updateSpy);
+  updateSpy();
 
   // Con content-visibility:auto las alturas de las secciones lejanas son
   // estimadas y el scroll a un ancla puede quedarse corto. Este manejador

@@ -1,25 +1,26 @@
 ---
 /**
- * Sala 2.1 — Lloyd, el ritmo por lotes. El ciclo se ve en dos tiempos nítidos:
- * primero TODOS los puntos se reasignan, y solo entonces los centroides saltan.
+ * Sala 2.1 — Lloyd: actualización por lotes. El ciclo se ve en sus dos fases:
+ * primero se reasignan TODOS los puntos, después se recalculan los centroides.
  */
 ---
 
 <section class="section" id="sala-lloyd" aria-labelledby="lloyd-titulo">
   <div class="prose reveal">
-    <h2 id="lloyd-titulo">Lloyd, el ritmo por lotes</h2>
+    <h2 id="lloyd-titulo">Lloyd: actualización por lotes</h2>
     <p>
-      Lloyd es el K-Means «de libro» y la base de todo lo demás. Su seña de
-      identidad es el <strong>movimiento en bloque</strong>: en cada iteración
-      se reasignan <em>todos</em> los puntos a la vez, y solo después los
-      centroides saltan de golpe a su nueva media. Dos tiempos, siempre en el
-      mismo orden.
+      Lloyd es la formulación clásica de K-Means y la referencia sobre la que
+      se definen las demás variantes. Actualiza <strong>por lotes</strong>: en
+      cada iteración se reasignan <em>todos</em> los puntos y solo después se
+      recalculan <em>todos</em> los centroides como la media de sus asignados.
+      Es el más simple y el más eficiente por iteración, aunque puede necesitar
+      más iteraciones para converger porque los centroides avanzan a saltos
+      grandes.
     </p>
     <p>
-      Avanza <em>tiempo a tiempo</em> y fíjate: primero cambian los colores
-      (asignación masiva), luego se mueven los centroides (actualización).
-      Puedes añadir puntos con un clic, arrastrarlos, o mover un centroide
-      para ver cómo cambia el ciclo desde ahí.
+      Recorre la ejecución fase a fase: primero la reasignación en bloque
+      (cambian las asignaciones con los centroides quietos), después la
+      actualización (los centroides se desplazan a la media de su grupo).
     </p>
   </div>
 
@@ -68,8 +69,9 @@
           <dd data-out="iteration">0</dd>
         </div>
         <div class="metric">
-          <dt>Inercia</dt>
+          <dt>inercia (SSE)</dt>
           <dd data-out="inertia">·</dd>
+        </div>
         <div class="metric">
           <dt>estado</dt>
           <dd data-out="status">listo</dd>
@@ -201,29 +203,29 @@
     const s = current();
     if (s.phase === 'inicio') {
       return (
-        'Semillas de clúster inicializadas. Pulsa <strong>reproducir</strong> o avanza con <strong>→</strong> ' +
-        'para ver el primer paso del ciclo por lotes.'
+        'Centroides inicializados en posiciones aleatorias. Pulsa <strong>reproducir</strong> o avanza con <strong>→</strong> ' +
+        'para ver la primera fase del ciclo por lotes.'
       );
     }
     if (s.phase === 'asignacion') {
       if (s.iteration === 1) {
-        return 'Cada punto se apunta al centroide más cercano y recibe su primer color. Los centroides todavía no se han movido.';
+        return 'Primera asignación: cada punto se asigna al centroide más cercano. Los centroides todavía no se han movido.';
       }
       const n = s.changed.length;
       return (
-        'Cada punto vuelve a elegir el centroide más cercano. ' +
+        'Cada punto se reasigna al centroide más cercano. ' +
         (n === 0
-          ? 'Ningún punto cambia de grupo: la partición ya es estable.'
+          ? 'Ninguna asignación cambia: la partición ya es estable.'
           : n === 1
-            ? '1 punto cambia de grupo (marcado con un aro).'
-            : `${n} puntos cambian de grupo (marcados con un aro).`)
+            ? '1 punto cambia de clúster (marcado con un aro).'
+            : `${n} puntos cambian de clúster (marcados con un aro).`)
       );
     }
     const conv = s.converged
-      ? ' El movimiento queda por debajo de la tolerancia: <strong>convergido</strong>.'
+      ? ' El desplazamiento queda por debajo de la tolerancia: <strong>convergido</strong>.'
       : '';
     return (
-      'Cada centroide salta a la media de los puntos que lo eligieron ' +
+      'Cada centroide se recalcula como la media de sus puntos asignados ' +
       `(desplazamiento máximo ${s.moved.toFixed(3)}).` +
       conv
     );
@@ -455,14 +457,14 @@
       history = history.slice(0, pos + 1);
       dragCentroid = cIdx;
       canvas.style.cursor = 'grabbing';
-      canvas.setPointerCapture(ev.pointerId);
+      try { canvas.setPointerCapture(ev.pointerId); } catch { /* puntero sintético o ya liberado */ }
       return;
     }
     const pIdx = hitPoint(p);
     if (pIdx >= 0) {
       dragPoint = pIdx;
       canvas.style.cursor = 'grabbing';
-      canvas.setPointerCapture(ev.pointerId);
+      try { canvas.setPointerCapture(ev.pointerId); } catch { /* puntero sintético o ya liberado */ }
     } else {
       points.push({ x: clamp01(p.x), y: clamp01(p.y) });
       reinit();

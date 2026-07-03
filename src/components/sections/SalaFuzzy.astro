@@ -1,28 +1,35 @@
 ---
 /**
- * Sala 2.5 — Fuzzy / Soft K-Means, la duda. Los puntos no tienen color sólido:
- * llevan una mezcla según su pertenencia a cada grupo. El deslizador `m`
- * endurece o difumina las fronteras; señalar un punto muestra sus porcentajes.
+ * Sala 2.5 — Fuzzy C-Means: pertenencias graduales. Los puntos no tienen color
+ * sólido: llevan una mezcla según su grado de pertenencia a cada clúster. El
+ * deslizador `m` endurece o difumina las fronteras; señalar un punto muestra
+ * sus porcentajes.
  */
 ---
 
 <section class="section" id="sala-fuzzy" aria-labelledby="fuzzy-titulo">
   <div class="prose reveal">
-    <h2 id="fuzzy-titulo">Fuzzy, la duda</h2>
+    <h2 id="fuzzy-titulo">Fuzzy C-Means: pertenencias graduales</h2>
     <p>
-      Todas las variantes anteriores obligan a cada punto a elegir un único
-      grupo. Fuzzy rompe esa rigidez: cada punto tiene un
-      <strong>grado de pertenencia</strong> a cada clúster (puede ser 70&nbsp;%
-      de uno y 30&nbsp;% de otro) y su color es literalmente esa mezcla. Es la
-      variante adecuada cuando los límites no están claros: segmentación de
-      imágenes, diagnóstico médico, perfiles de clientes.
+      Las variantes anteriores asignan cada punto a un único clúster. Fuzzy
+      C-Means relaja esa restricción: cada punto tiene un
+      <strong>grado de pertenencia</strong> a cada clúster, entre 0 y 1 y con
+      suma 1 (puede ser 70&nbsp;% de uno y 30&nbsp;% de otro), y su color es
+      esa mezcla. Es la variante adecuada cuando los límites entre grupos no
+      están claros, y sus aplicaciones son amplias: segmentación de imágenes
+      por color y textura, segmentación de clientes en marketing, diagnóstico
+      médico con síntomas compatibles con varios cuadros, monitoreo ambiental o
+      evaluación de riesgos.
     </p>
     <p>
-      Pasa el ratón por los puntos tras converger: verás mezclas de pertenencia
-      reales, como «70 % de un grupo y 30 % de otro». Si reduces `m` a 1.2
-      (límites más rígidos), los colores vuelven a ser puros. Si lo subes, la
-      incertidumbre inunda el mapa.
-      Puedes añadir puntos haciendo clic, arrastrarlos o mover sus centroides para ver cómo cambian sus pertenencias.
+      El parámetro de borrosidad <em>m</em> controla la transición: con valores
+      próximos a 1 las pertenencias tienden a una asignación dura, como en el
+      K-Means clásico; con valores altos se reparten y las fronteras se
+      difuminan. Esta flexibilidad admite grupos solapados, aporta robustez
+      ante ruido y valores atípicos, y da una lectura más rica de los datos; a
+      cambio es más costoso computacionalmente, y elegir bien <em>k</em> y las
+      funciones de pertenencia puede requerir experiencia. Tras converger,
+      señala los puntos de frontera para leer sus porcentajes de pertenencia.
     </p>
   </div>
 
@@ -75,7 +82,7 @@
           <dd data-out="iteration">0</dd>
         </div>
         <div class="metric">
-          <dt>Inercia (dura)</dt>
+          <dt>inercia (SSE dura)</dt>
           <dd data-out="inertia">·</dd>
         </div>
         <div class="metric">
@@ -177,16 +184,16 @@
     const s = current();
     if (s.iteration === 0) {
       return (
-        'Pertenencias iniciales al azar. Pulsa <strong>reproducir</strong> o <strong>→</strong> ' +
-        'para ver cómo las pertenencias se van ajustando y los colores convergen.'
+        'Pertenencias iniciales aleatorias (cada fila suma 1). Pulsa <strong>reproducir</strong> o <strong>→</strong> ' +
+        'para ver cómo se ajustan las pertenencias en cada iteración.'
       );
     }
     const conv = s.converged
       ? ' Las pertenencias apenas cambian: <strong>convergido</strong>.'
       : '';
     return (
-      `Iteración ${s.iteration}. Los centroides se recalculan como media ponderada (u<sup>m</sup>), ` +
-      `luego las pertenencias se actualizan con la regla fuzzy.${conv}`
+      'Cada centroide se recalcula como media ponderada por la pertenencia (u<sup>m</sup>) y, con las ' +
+      `nuevas distancias, se actualizan las pertenencias de cada punto.${conv}`
     );
   }
 
@@ -432,14 +439,14 @@
       history = history.slice(0, pos + 1);
       dragCentroid = cIdx;
       canvas.style.cursor = 'grabbing';
-      canvas.setPointerCapture(ev.pointerId);
+      try { canvas.setPointerCapture(ev.pointerId); } catch { /* puntero sintético o ya liberado */ }
       return;
     }
     const pIdx = hitPoint(p);
     if (pIdx >= 0) {
       dragPoint = pIdx;
       canvas.style.cursor = 'grabbing';
-      canvas.setPointerCapture(ev.pointerId);
+      try { canvas.setPointerCapture(ev.pointerId); } catch { /* puntero sintético o ya liberado */ }
     } else {
       points.push({ x: clamp01(p.x), y: clamp01(p.y) });
       reinit();

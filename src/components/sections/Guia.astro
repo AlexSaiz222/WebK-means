@@ -1,136 +1,173 @@
 ---
 /**
- * Sección 4 — La guía de decisión. Convierte lo explorado en una conclusión
- * útil: "si tus datos son X → usa Y, porque Z", enlazando de vuelta a la sala.
+ * Sección 4 — La guía de decisión. Tabla comparativa de las cinco variantes,
+ * basada en el resumen del Tema 3: cómo actualiza cada una los centroides,
+ * cuál es su fortaleza y cuándo elegirla. Cada variante enlaza con su sala.
  */
-const GUIA = [
+const FILAS = [
   {
-    id: 'general',
-    situacion: 'datos estáticos, caso general',
     variante: 'Lloyd',
     sala: '#sala-lloyd',
-    porque:
-      'Actualiza por lotes: el más simple, predecible y fácil de razonar. Si ninguna de las otras situaciones te describe, empieza aquí: es la línea base sobre la que se mide todo lo demás.',
+    actualizacion: 'Por lotes, tras asignar todos los puntos',
+    fortaleza: 'Simplicidad; el más eficiente por iteración',
+    debilidad: 'Necesita más iteraciones; sensible a la inicialización',
+    cuando: 'Caso general, con datos estáticos',
   },
   {
-    id: 'flujo',
-    situacion: 'los datos llegan en flujo continuo',
     variante: 'MacQueen',
     sala: '#sala-macqueen',
-    porque:
-      'Procesa los puntos de uno en uno y ajusta los centroides sobre la marcha, así que no necesita esperar al lote completo y suele converger en menos pasadas. A cambio, el orden de llegada puede cambiar el resultado.',
+    actualizacion: 'Tras cada punto, con la media incremental',
+    fortaleza: 'Converge en menos pasadas; procesa datos según llegan',
+    debilidad: 'Más cálculo por iteración; sensible al orden de llegada',
+    cuando: 'Datos que llegan en flujo continuo',
   },
   {
-    id: 'calidad',
-    situacion: 'la calidad del agrupamiento es lo primero',
     variante: 'Hartigan-Wong',
     sala: '#sala-hartigan',
-    porque:
-      'No pregunta «¿cuál está más cerca?» sino «¿esto reduce la inercia?». Esa pregunta más cara le permite escapar de malos mínimos locales donde Lloyd se queda atascado.',
+    actualizacion: 'Local, punto a punto, solo si reduce la inercia',
+    fortaleza: 'Escapa mejor de los mínimos locales; menos iteraciones',
+    debilidad: 'Más complejo de implementar',
+    cuando: 'Cuando la calidad del agrupamiento es prioritaria',
   },
   {
-    id: 'grande',
-    situacion: 'el dataset es enorme y el coste importa',
     variante: 'Elkan',
     sala: '#sala-elkan',
-    porque:
-      'Da exactamente el mismo resultado que Lloyd, pero descarta centroides con la desigualdad triangular sin llegar a medirlos. El ahorro de cálculos crece con el tamaño de los datos.',
+    actualizacion: 'Por lotes, con el mismo resultado que Lloyd',
+    fortaleza: 'Muchos menos cálculos de distancia; escalable',
+    debilidad: 'Más complejo; sensible a la inicialización',
+    cuando: 'Datasets grandes donde el coste importa',
   },
   {
-    id: 'difuso',
-    situacion: 'las fronteras entre grupos no están claras',
-    variante: 'Fuzzy / Soft K-Means',
+    variante: 'Fuzzy C-Means',
     sala: '#sala-fuzzy',
-    porque:
-      'Sustituye la etiqueta rígida por grados de pertenencia: un punto puede ser 70 % de un grupo y 30 % de otro. Más costoso, pero robusto ante solapes, ruido y casos ambiguos.',
+    actualizacion: 'Media ponderada por el grado de pertenencia',
+    fortaleza: 'Grupos solapados; robusto ante ruido y atípicos',
+    debilidad: 'Más costoso; elegir k y m requiere criterio',
+    cuando: 'Cuando los límites entre grupos no están claros',
   },
 ];
 ---
 
 <section class="section" id="guia" aria-labelledby="guia-titulo">
   <div class="prose reveal">
-    <h2 id="guia-titulo">¿Cuál elijo?</h2>
+    <h2 id="guia-titulo">Guía de decisión</h2>
     <p>
       La pregunta del principio ya tiene respuesta: existen cinco versiones
-      porque <strong>ninguna gana siempre</strong>. Cada una paga un precio
-      distinto (simplicidad, orden, cálculo, rigidez) a cambio de una virtud
-      distinta. Elegir bien es cuestión de saber qué forma tienen tus datos y
-      qué te importa más.
+      porque <strong>ninguna es superior en todos los casos</strong>. Cada una
+      asume un compromiso distinto entre simplicidad, coste de cálculo,
+      sensibilidad al orden y rigidez de la asignación. Son las mismas ideas
+      que se aplican en problemas reales como la compresión de imágenes, la
+      segmentación de clientes o el diagnóstico médico.
     </p>
-    <p>Indica tu situación:</p>
   </div>
 
   <div class="lab reveal">
-    <div class="controls">
-      {
-        GUIA.map((g) => (
-          <button class="btn situacion" data-g={g.id} aria-pressed="false">
-            {g.situacion}
-          </button>
-        ))
-      }
+    <div class="panel tabla-wrap">
+      <table>
+        <colgroup>
+          <col class="c-variante" />
+          <col class="c-actualizacion" />
+          <col class="c-fortaleza" />
+          <col class="c-cambio" />
+          <col class="c-cuando" />
+        </colgroup>
+        <thead>
+          <tr>
+            <th scope="col">variante</th>
+            <th scope="col">actualización de centroides</th>
+            <th scope="col">fortaleza</th>
+            <th scope="col">a cambio</th>
+            <th scope="col">cuándo elegirla</th>
+          </tr>
+        </thead>
+        <tbody>
+          {
+            FILAS.map((f) => (
+              <tr>
+                <th scope="row">
+                  <a href={f.sala}>{f.variante}</a>
+                </th>
+                <td>{f.actualizacion}</td>
+                <td>{f.fortaleza}</td>
+                <td>{f.debilidad}</td>
+                <td>{f.cuando}</td>
+              </tr>
+            ))
+          }
+        </tbody>
+      </table>
     </div>
-    {
-      GUIA.map((g) => (
-        <article class="ficha" data-card={g.id} hidden>
-          <h3>usa {g.variante}</h3>
-          <p>{g.porque}</p>
-          <a href={g.sala}>volver a su sala ↑</a>
-        </article>
-      ))
-    }
-    <p class="caption placeholder" data-placeholder>
-      la recomendación aparecerá aquí
+    <p class="caption tabla-nota">
+      Resumen del Tema 3. Cada variante enlaza con su sala interactiva para
+      volver a comprobarlo.
     </p>
   </div>
 </section>
 
 <style>
-  .situacion[aria-pressed='true'] {
-    border-color: var(--accent);
+  .tabla-wrap {
+    overflow-x: auto;
+  }
+
+  table {
+    width: 100%;
+    min-width: 760px;
+    border-collapse: collapse;
+    font-size: 0.93rem;
+    line-height: 1.45;
+    table-layout: fixed;
+  }
+
+  col.c-variante { width: 15%; }
+  col.c-actualizacion { width: 24%; }
+  col.c-fortaleza { width: 23%; }
+  col.c-cambio { width: 19%; }
+  col.c-cuando { width: 19%; }
+
+  thead th {
+    text-align: left;
+    font-size: 0.7rem;
+    font-weight: 650;
+    letter-spacing: 0.09em;
+    text-transform: uppercase;
+    color: var(--ink-soft);
+    padding: 14px 18px;
+    border-bottom: 1px solid var(--line);
+    vertical-align: bottom;
+  }
+
+  tbody th,
+  tbody td {
+    text-align: left;
+    vertical-align: top;
+    padding: 16px 18px;
+    border-bottom: 1px solid var(--line);
+  }
+
+  tbody tr:last-child th,
+  tbody tr:last-child td {
+    border-bottom: none;
+  }
+
+  tbody th {
+    font-weight: 650;
+  }
+
+  tbody th a {
     color: var(--accent);
+    text-decoration: none;
   }
 
-  .ficha {
-    border: 1px solid var(--line);
-    border-left: 3px solid var(--accent);
-    background: var(--surface);
-    padding: 24px 28px;
-    max-width: 62ch;
+  tbody th a:hover,
+  tbody th a:focus-visible {
+    text-decoration: underline;
   }
 
-  .ficha h3 {
-    margin-block: 0 8px;
-    font-size: 1.25rem;
+  tbody tr:hover {
+    background: rgb(45 91 255 / 0.03);
   }
 
-  .ficha p {
-    margin-block-end: 12px;
-  }
-
-  .ficha a {
-    color: var(--accent);
-    font-size: 0.95rem;
-  }
-
-  .placeholder {
-    padding: 24px 28px;
-    border: 1px dashed var(--line);
-    max-width: 62ch;
+  .tabla-nota {
+    margin-block-start: 12px;
   }
 </style>
-
-<script>
-  const root = document.getElementById('guia')!;
-  const buttons = root.querySelectorAll<HTMLButtonElement>('.situacion');
-  const cards = root.querySelectorAll<HTMLElement>('[data-card]');
-  const placeholder = root.querySelector<HTMLElement>('[data-placeholder]')!;
-
-  for (const b of buttons) {
-    b.addEventListener('click', () => {
-      placeholder.hidden = true;
-      for (const other of buttons) other.setAttribute('aria-pressed', String(other === b));
-      for (const card of cards) card.hidden = card.dataset.card !== b.dataset.g;
-    });
-  }
-</script>

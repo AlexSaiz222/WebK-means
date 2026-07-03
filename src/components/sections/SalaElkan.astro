@@ -1,22 +1,26 @@
 ---
 /**
- * Sala 2.4 — Elkan, el ahorro invisible. Da el mismo resultado que Lloyd, así
- * que su historia se cuenta con dos contadores de distancias en paralelo y una
- * ilustración de la desigualdad triangular. El momento "ajá" del proyecto.
+ * Sala 2.4 — Elkan: aceleración por la desigualdad triangular. Produce el
+ * mismo resultado que Lloyd; la diferencia se muestra con dos contadores de
+ * distancias en paralelo y una ilustración de la desigualdad triangular.
  */
 ---
 
 <section class="section" id="sala-elkan" aria-labelledby="elkan-titulo">
   <div class="prose reveal">
-    <h2 id="elkan-titulo">Elkan, el ahorro invisible</h2>
+    <h2 id="elkan-titulo">Elkan: aceleración por la desigualdad triangular</h2>
     <p>
-      Elkan produce <strong>exactamente el mismo resultado</strong> que Lloyd.
-      Su historia no está en los grupos: está en el trabajo que se ahorra.
-      Mantiene límites superior e inferior de cada distancia y usa la
+      Elkan produce <strong>exactamente el mismo resultado</strong> que Lloyd;
+      su ventaja está en el coste computacional. Mantiene límites superior e
+      inferior de la distancia de cada punto a los centroides y aplica la
       <strong>desigualdad triangular</strong> para descartar centroides
-      <em>sin llegar a medirlos</em>. Misma respuesta con muchos menos
-      cálculos, y esa diferencia se dispara en datasets grandes.
-      Puedes añadir puntos haciendo clic en cualquiera de los lienzos, arrastrarlos o mover sus centroides para ver el ahorro de distancias en tiempo real.
+      <em>sin llegar a medirlos</em>; cada vez que los centroides se mueven,
+      los límites se actualizan para minimizar los cálculos futuros. El
+      resultado es eficiencia y <strong>escalabilidad</strong> en datasets
+      grandes, a cambio de una implementación más compleja y de la misma
+      sensibilidad a la inicialización de todo K-Means. Es la aceleración que
+      usan librerías como scikit-learn, por ejemplo al comprimir una imagen
+      reduciendo su paleta a <em>k</em> colores.
     </p>
   </div>
 
@@ -44,8 +48,8 @@
           <figcaption class="caption">Elkan</figcaption>
           <canvas data-canvas="elkan" aria-label="Elkan sobre los mismos datos y semilla"></canvas>
         </figure>
+        <p class="hint" data-hint>arrastra puntos o centroides en cualquiera de los lienzos · clic para añadir</p>
       </div>
-      <p class="hint" data-hint>arrastra puntos o centroides en cualquiera de los lienzos · clic para añadir</p>
       <div class="controls timeline">
         <button class="btn btn-primary" data-action="play">reproducir</button>
         <button class="btn arrow" data-action="back" aria-label="fase anterior">←</button>
@@ -122,6 +126,13 @@
     grid-template-columns: 1fr 1fr;
     gap: 16px;
     padding: 16px;
+    /* la pista se posiciona respecto a la zona de lienzos, no al panel */
+    position: relative;
+  }
+
+  .race .hint {
+    bottom: 22px;
+    right: 26px;
   }
 
   .race figure {
@@ -239,8 +250,8 @@
     const s = current();
     if (s.iteration === 0) {
       return (
-        'Ambos algoritmos arrancan con la misma semilla (k-means++). Pulsa <strong>reproducir</strong> o <strong>→</strong> ' +
-        'para ver cómo avanzan en paralelo: mismas etiquetas, distinto trabajo.'
+        'Ambos algoritmos parten de la misma inicialización (k-means++). Pulsa <strong>reproducir</strong> o <strong>→</strong> ' +
+        'para verlos avanzar en paralelo: mismas etiquetas, distinto número de cálculos.'
       );
     }
     const saving = s.lloydDists > 0
@@ -250,8 +261,8 @@
       ? ' <strong>Convergido.</strong>'
       : '';
     return (
-      `Iteración ${s.iteration}. Lloyd calculó <strong>${fmt.format(s.lloydDists)}</strong> distancias, ` +
-      `Elkan solo <strong>${fmt.format(s.elkanDists)}</strong> (ahorro ${saving} %).${conv}`
+      `Lloyd ha calculado <strong>${fmt.format(s.lloydDists)}</strong> distancias y ` +
+      `Elkan <strong>${fmt.format(s.elkanDists)}</strong>, un ahorro del ${saving} %.${conv}`
     );
   }
 
@@ -331,10 +342,16 @@
     loop();
   }
 
-  function reinit() {
+  function reinit(startCentroids?: Point[]) {
     stopPlay();
     lloyd.init(points, k, seed + dataSeed);
     elkan.init(points, k, seed + dataSeed);
+    // arranque manual (centroide arrastrado): ambos parten de los MISMOS
+    // centroides, que es la condición para que Elkan == Lloyd
+    if (startCentroids) {
+      lloyd.centroids = startCentroids.map((c) => ({ ...c }));
+      elkan.centroids = startCentroids.map((c) => ({ ...c }));
+    }
     history = [snapshot()];
     pos = 0;
     computeRun();
@@ -348,7 +365,7 @@
   });
   btn('step').addEventListener('click', () => { stopPlay(); forward(); });
   btn('back').addEventListener('click', () => { stopPlay(); back(); });
-  btn('reset').addEventListener('click', reinit);
+  btn('reset').addEventListener('click', () => reinit());
   btn('regen').addEventListener('click', () => {
     dataSeed++;
     points = SHAPES[shape]!(dataSeed, 200);
@@ -451,14 +468,14 @@
         history = history.slice(0, pos + 1);
         dragCentroid = cIdx;
         canvas.style.cursor = 'grabbing';
-        canvas.setPointerCapture(ev.pointerId);
+        try { canvas.setPointerCapture(ev.pointerId); } catch { /* puntero sintético o ya liberado */ }
         return;
       }
       const pIdx = hitPoint(p, renderer);
       if (pIdx >= 0) {
         dragPoint = pIdx;
         canvas.style.cursor = 'grabbing';
-        canvas.setPointerCapture(ev.pointerId);
+        try { canvas.setPointerCapture(ev.pointerId); } catch { /* puntero sintético o ya liberado */ }
       } else {
         points.push({ x: clamp01(p.x), y: clamp01(p.y) });
         reinit();
@@ -493,9 +510,9 @@
       if (dragCentroid >= 0) {
         dragCentroid = -1;
         canvas.style.cursor = 'grab';
-        // re-init both algos with the centroids at their dragged positions
-        // (we need to fully reinit since Elkan has internal bounds state)
-        reinit();
+        // nueva ejecución completa desde los centroides arrastrados
+        // (reinicio total porque Elkan guarda límites internos)
+        reinit(current().lloydCentroids);
         return;
       }
       if (dragPoint >= 0) {

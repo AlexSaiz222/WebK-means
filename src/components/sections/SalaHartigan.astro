@@ -1,29 +1,32 @@
 ---
 /**
- * Sala 2.3 — Hartigan-Wong, la pregunta inteligente. Al pasar el ratón sobre
- * un punto se ve si moverlo a otro grupo reduce o no la inercia:
- * solo se mueve si mejora, aunque el destino no sea el centroide más cercano.
+ * Sala 2.3 — Hartigan-Wong: reasignación por mejora de la inercia. Al señalar
+ * un punto se ve si moverlo a otro clúster reduce o no la inercia total:
+ * solo se traslada si mejora, aunque el destino no sea el más cercano.
  */
 ---
 
 <section class="section" id="sala-hartigan" aria-labelledby="hartigan-titulo">
   <div class="prose reveal">
-    <h2 id="hartigan-titulo">Hartigan-Wong, la pregunta inteligente</h2>
+    <h2 id="hartigan-titulo">Hartigan-Wong: reasignación por mejora de la inercia</h2>
     <p>
-      Las dos variantes anteriores preguntan «¿cuál es el centroide más
-      cercano?». Hartigan-Wong hace una pregunta mejor: «si muevo este punto,
-      <strong>¿baja la inercia?</strong>». Mover un punto desplaza
-      <em>dos</em> centroides, el que lo pierde y el que lo gana, y la fórmula
-      tiene en cuenta ambos efectos. Por eso un punto puede quedarse en un
-      grupo cuyo centroide <em>no</em> es el más cercano, y por eso escapa
-      mejor de malos mínimos locales.
+      Una mala inicialización puede llevar a Lloyd y a MacQueen a converger a
+      un óptimo local. Hartigan-Wong reduce ese riesgo desde el arranque:
+      asigna los puntos a los clústeres <strong>al azar</strong> y calcula cada
+      centroide como la media de sus asignados, de modo que todos parten de
+      posiciones parecidas. Después aplica un criterio más exigente que el de
+      la cercanía: un punto solo cambia de clúster si el traslado
+      <strong>reduce la inercia total</strong>. Mover un punto desplaza
+      <em>dos</em> centroides, el que lo pierde y el que lo gana, y el cálculo
+      tiene en cuenta ambos efectos. Por eso un punto puede permanecer en un
+      clúster cuyo centroide <em>no</em> es el más cercano. Sus actualizaciones
+      son más frecuentes y locales que las de Lloyd: suele necesitar menos
+      iteraciones, a cambio de una implementación más compleja.
     </p>
     <p>
-      Pasa el ratón sobre un punto: la línea continua es lo que se ganaría por
-      salir de su grupo; la discontinua, lo que costaría entrar en el mejor
-      candidato. Solo se muda si la ganancia supera al coste.
-      Puedes añadir puntos haciendo clic, arrastrarlos o desplazar los centroides
-      para recalcular el balance de inmediato.
+      Señala un punto con el ratón: la línea continua representa la ganancia
+      por salir de su clúster; la discontinua, el coste de entrar en el mejor
+      candidato. El punto solo se traslada si la ganancia supera al coste.
     </p>
   </div>
 
@@ -31,8 +34,8 @@
     <div class="panel">
       <div class="controls toolbar">
         <div class="seg" role="group" aria-label="forma de los datos">
-          <button class="seg-btn" data-shape="redondos" aria-pressed="true">redondos</button>
-          <button class="seg-btn" data-shape="alargados" aria-pressed="false">alargados</button>
+          <button class="seg-btn" data-shape="redondos" aria-pressed="false">redondos</button>
+          <button class="seg-btn" data-shape="alargados" aria-pressed="true">alargados</button>
           <button class="seg-btn" data-shape="desiguales" aria-pressed="false">desiguales</button>
           <button class="seg-btn" data-shape="lunas" aria-pressed="false">lunas</button>
         </div>
@@ -72,7 +75,7 @@
           <dd data-out="iteration">0</dd>
         </div>
         <div class="metric">
-          <dt>Inercia</dt>
+          <dt>inercia (SSE)</dt>
           <dd data-out="inertia">·</dd>
         </div>
         <div class="metric">
@@ -176,15 +179,15 @@
     const s = current();
     if (s.iteration === 0) {
       return (
-        'Semillas iniciales asignadas al azar. Pulsa <strong>reproducir</strong> o avanza con <strong>→</strong> ' +
-        'para ver la evaluación iterativa de Hartigan-Wong.'
+        'Asignación inicial aleatoria: los centroides parten como la media de sus puntos y quedan en posiciones ' +
+        'parecidas. Pulsa <strong>reproducir</strong> o avanza con <strong>→</strong> para ver las reasignaciones.'
       );
     }
     const conv = s.converged
-      ? ' El algoritmo no encuentra más reasignaciones ventajosas: <strong>convergido</strong>.'
+      ? ' No quedan traslados que reduzcan la inercia: <strong>convergido</strong>.'
       : '';
     return (
-      `Iteración ${s.iteration}. Cada punto es evaluado para ver si cambiarlo de clúster reduce la inercia global.` +
+      'Cada punto se evalúa individualmente: solo cambia de clúster si el traslado reduce la inercia total.' +
       conv
     );
   }
@@ -446,14 +449,14 @@
       history = history.slice(0, pos + 1);
       dragCentroid = cIdx;
       canvas.style.cursor = 'grabbing';
-      canvas.setPointerCapture(ev.pointerId);
+      try { canvas.setPointerCapture(ev.pointerId); } catch { /* puntero sintético o ya liberado */ }
       return;
     }
     const pIdx = hitPoint(p);
     if (pIdx >= 0) {
       dragPoint = pIdx;
       canvas.style.cursor = 'grabbing';
-      canvas.setPointerCapture(ev.pointerId);
+      try { canvas.setPointerCapture(ev.pointerId); } catch { /* puntero sintético o ya liberado */ }
     } else {
       points.push({ x: clamp01(p.x), y: clamp01(p.y) });
       reinit();
